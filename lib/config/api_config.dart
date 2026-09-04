@@ -1,6 +1,3 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 class ApiConfig {
   // Railway live backend URL
   static const String _productionUrl = 'https://mi-proyecto-backend-production-9c3c.up.railway.app/api/v1';

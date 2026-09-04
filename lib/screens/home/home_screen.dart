@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
+import '../catalog/catalog_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,10 +15,10 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.shield_outlined, color: Color(0xFF3B82F6), size: 22),
+            Icon(Icons.checkroom_rounded, color: Color(0xFF3B82F6), size: 22),
             SizedBox(width: 8),
             Text(
-              'AuthSystem Pro',
+              'Prendas & Stock',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],
@@ -65,12 +66,12 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                  colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,7 +100,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             SizedBox(width: 6),
                             Text(
-                              'Sesión Segura JWT',
+                              'Sesión Activa',
                               style: TextStyle(
                                 color: Color(0xFF4ADE80),
                                 fontSize: 12,
@@ -121,7 +122,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Tu sesión está autenticada y protegida con tokens seguros en el dispositivo.',
+                    'Explora el catálogo de prendas y consulta el stock disponible en cada sucursal.',
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
                       fontSize: 14,
@@ -130,7 +131,35 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
+
+            // Quick access - Catalog
+            _QuickAccessCard(
+              icon: Icons.grid_view_rounded,
+              iconColor: const Color(0xFF3B82F6),
+              iconBg: const Color(0xFF1E3A5F),
+              title: 'Ver Catálogo',
+              subtitle: 'Explora todas las prendas disponibles',
+              label: 'Abrir',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CatalogScreen()),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _QuickAccessCard(
+              icon: Icons.inventory_2_outlined,
+              iconColor: const Color(0xFF8B5CF6),
+              iconBg: const Color(0xFF2D1B69),
+              title: 'Stock por Sucursal',
+              subtitle: 'Consulta disponibilidad en tiempo real',
+              label: 'Consultar',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CatalogScreen()),
+              ),
+            ),
+            const SizedBox(height: 24),
 
             // Profile Info Card
             Card(
@@ -144,7 +173,7 @@ class HomeScreen extends StatelessWidget {
                         Icon(Icons.badge_outlined, color: Color(0xFF3B82F6)),
                         SizedBox(width: 8),
                         Text(
-                          'Detalles de tu Perfil',
+                          'Tu Perfil',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -157,8 +186,6 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildInfoRow('Email', user?.email ?? '-'),
                     const SizedBox(height: 12),
-                    _buildInfoRow('ID', user?.id ?? '-', isCode: true),
-                    const SizedBox(height: 12),
                     _buildInfoRow('Estado', user?.isActive == true ? 'Activo ✅' : 'Inactivo'),
                   ],
                 ),
@@ -166,7 +193,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Architecture Specs Card
+            // Ecosystem card
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -195,7 +222,7 @@ class HomeScreen extends StatelessWidget {
                         Chip(label: Text('🅰️ Angular Web')),
                         Chip(label: Text('📱 Flutter Móvil')),
                         Chip(label: Text('🐘 PostgreSQL 16')),
-                        Chip(label: Text('🔐 Flutter Secure Storage')),
+                        Chip(label: Text('🔐 Secure Storage')),
                       ],
                     ),
                   ],
@@ -230,6 +257,92 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickAccessCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String subtitle;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAccessCard({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    required this.subtitle,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A2234),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: iconColor.withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: iconColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

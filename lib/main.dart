@@ -5,6 +5,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'services/catalog_service.dart';
 import 'services/storage_service.dart';
 
 void main() {
@@ -13,6 +14,7 @@ void main() {
   final storageService = StorageService();
   final apiService = ApiService(storageService);
   final authService = AuthService(apiService, storageService);
+  final catalogService = CatalogService(apiService);
 
   runApp(
     MultiProvider(
@@ -20,6 +22,7 @@ void main() {
         Provider<StorageService>.value(value: storageService),
         Provider<ApiService>.value(value: apiService),
         ChangeNotifierProvider<AuthService>.value(value: authService),
+        ChangeNotifierProvider<CatalogService>.value(value: catalogService),
       ],
       child: const MyApp(),
     ),
@@ -32,7 +35,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AuthSystem Pro',
+      title: 'Prendas & Stock',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
