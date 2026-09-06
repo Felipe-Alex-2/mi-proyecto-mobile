@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authService.errorMessage!),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -70,19 +71,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 64,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+                            colors: [AppTheme.terracotta, AppTheme.terracottaLight],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.35),
+                              color: AppTheme.terracotta.withValues(alpha: 0.35),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
                           ],
                         ),
                         child: const Icon(
-                          Icons.lock_rounded,
+                          Icons.checkroom_rounded,
                           color: Colors.white,
                           size: 32,
                         ),
@@ -98,15 +99,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.5,
+                        color: AppTheme.brown,
                       ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Accede a tu cuenta en la app móvil',
+                      'Accede a tu cuenta FashionStore',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF94A3B8),
+                        color: AppTheme.brownMedium,
                       ),
                     ),
                     const SizedBox(height: 36),
@@ -195,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         const Text(
                           '¿No tienes cuenta? ',
-                          style: TextStyle(color: Color(0xFF94A3B8)),
+                          style: TextStyle(color: AppTheme.brownMedium),
                         ),
                         TextButton(
                           onPressed: () {
@@ -208,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Text(
                             'Regístrate gratis',
                             style: TextStyle(
-                              color: Color(0xFF60A5FA),
+                              color: AppTheme.terracotta,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

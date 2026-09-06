@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../models/product.dart';
 import '../../services/catalog_service.dart';
 import 'product_detail_screen.dart';
@@ -32,24 +33,29 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090D16),
+      backgroundColor: AppTheme.cream,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121826),
+        backgroundColor: AppTheme.surface,
         elevation: 0,
+        foregroundColor: AppTheme.brown,
         title: const Row(
           children: [
-            Icon(Icons.checkroom_rounded, color: Color(0xFF3B82F6), size: 22),
+            Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
             SizedBox(width: 8),
             Text(
               'Catálogo',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppTheme.brown,
+              ),
             ),
           ],
         ),
         actions: [
           Consumer<CatalogService>(
             builder: (_, catalog, __) => IconButton(
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
               tooltip: 'Actualizar',
               onPressed: catalog.loadProducts,
             ),
@@ -68,7 +74,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget _buildSearchAndFilter() {
     return Consumer<CatalogService>(
       builder: (_, catalog, __) => Container(
-        color: const Color(0xFF121826),
+        color: AppTheme.surface,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           children: [
@@ -78,10 +84,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
               onChanged: catalog.setSearch,
               decoration: InputDecoration(
                 hintText: 'Buscar prendas...',
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8)),
+                prefixIcon:
+                    const Icon(Icons.search_rounded, color: AppTheme.brownMedium),
                 suffixIcon: catalog.searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, color: Color(0xFF94A3B8)),
+                        icon: const Icon(
+                          Icons.clear_rounded,
+                          color: AppTheme.brownMedium,
+                        ),
                         onPressed: () {
                           _searchController.clear();
                           catalog.setSearch('');
@@ -104,17 +114,20 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       child: ChoiceChip(
                         label: Text(cat),
                         selected: isSelected,
-                        selectedColor: const Color(0xFF3B82F6),
-                        backgroundColor: const Color(0xFF1A2234),
+                        selectedColor: AppTheme.terracotta,
+                        backgroundColor: AppTheme.creamLight,
                         labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.brownMedium,
                           fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
                         side: BorderSide(
                           color: isSelected
-                              ? const Color(0xFF3B82F6)
-                              : Colors.white12,
+                              ? AppTheme.terracotta
+                              : AppTheme.terracotta.withValues(alpha: 0.2),
                         ),
                         onSelected: (_) => catalog.setCategory(cat),
                       ),
@@ -136,9 +149,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircularProgressIndicator(color: Color(0xFF3B82F6)),
+                CircularProgressIndicator(color: AppTheme.terracotta),
                 SizedBox(height: 16),
-                Text('Cargando catálogo...', style: TextStyle(color: Color(0xFF94A3B8))),
+                Text(
+                  'Cargando catálogo...',
+                  style: TextStyle(color: AppTheme.brownMedium),
+                ),
               ],
             ),
           );
@@ -151,17 +167,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.wifi_off_rounded, size: 64, color: Color(0xFF475569)),
+                  const Icon(
+                    Icons.wifi_off_rounded,
+                    size: 64,
+                    color: AppTheme.brownMedium,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'No se pudo cargar el catálogo',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.brown,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     catalog.errorMessage ?? 'Error desconocido',
-                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    style: const TextStyle(
+                      color: AppTheme.brownMedium,
+                      fontSize: 13,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -183,18 +210,27 @@ class _CatalogScreenState extends State<CatalogScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.search_off_rounded, size: 64, color: Color(0xFF475569)),
+                const Icon(
+                  Icons.search_off_rounded,
+                  size: 64,
+                  color: AppTheme.brownMedium,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Sin resultados',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.brown,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Prueba con otra búsqueda o categoría',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                  style: TextStyle(color: AppTheme.brownMedium, fontSize: 14),
                 ),
-                if (catalog.searchQuery.isNotEmpty || catalog.selectedCategory != 'Todos')
+                if (catalog.searchQuery.isNotEmpty ||
+                    catalog.selectedCategory != 'Todos')
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: TextButton.icon(
@@ -243,9 +279,11 @@ class _ProductCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2234),
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(
+            color: AppTheme.terracotta.withValues(alpha: 0.12),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,7 +292,8 @@ class _ProductCard extends StatelessWidget {
             Expanded(
               flex: 5,
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
                 child: _buildImage(),
               ),
             ),
@@ -271,6 +310,7 @@ class _ProductCard extends StatelessWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
+                        color: AppTheme.brown,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -279,7 +319,7 @@ class _ProductCard extends StatelessWidget {
                     Text(
                       product.category,
                       style: const TextStyle(
-                        color: Color(0xFF94A3B8),
+                        color: AppTheme.brownMedium,
                         fontSize: 11,
                       ),
                     ),
@@ -291,7 +331,7 @@ class _ProductCard extends StatelessWidget {
                           child: Text(
                             _priceText(),
                             style: const TextStyle(
-                              color: Color(0xFF3B82F6),
+                              color: AppTheme.terracotta,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -327,8 +367,12 @@ class _ProductCard extends StatelessWidget {
     final url = product.imageUrl;
     if (url == null || url.isEmpty) {
       return Container(
-        color: const Color(0xFF0F172A),
-        child: const Icon(Icons.checkroom_rounded, size: 40, color: Color(0xFF3B82F6)),
+        color: AppTheme.creamLight,
+        child: const Icon(
+          Icons.checkroom_rounded,
+          size: 40,
+          color: AppTheme.terracotta,
+        ),
       );
     }
     if (url.startsWith('data:image')) {
@@ -337,8 +381,12 @@ class _ProductCard extends StatelessWidget {
         return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {
         return Container(
-          color: const Color(0xFF0F172A),
-          child: const Icon(Icons.broken_image_rounded, size: 40, color: Color(0xFF475569)),
+          color: AppTheme.creamLight,
+          child: const Icon(
+            Icons.broken_image_rounded,
+            size: 40,
+            color: AppTheme.brownMedium,
+          ),
         );
       }
     }
@@ -346,8 +394,12 @@ class _ProductCard extends StatelessWidget {
       url,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Container(
-        color: const Color(0xFF0F172A),
-        child: const Icon(Icons.checkroom_rounded, size: 40, color: Color(0xFF3B82F6)),
+        color: AppTheme.creamLight,
+        child: const Icon(
+          Icons.checkroom_rounded,
+          size: 40,
+          color: AppTheme.terracotta,
+        ),
       ),
     );
   }
@@ -363,19 +415,19 @@ class _StockBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: available
-            ? const Color(0xFF22C55E).withValues(alpha: 0.15)
-            : const Color(0xFFEF4444).withValues(alpha: 0.15),
+            ? AppTheme.successColor.withValues(alpha: 0.1)
+            : AppTheme.errorColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: available
-              ? const Color(0xFF22C55E).withValues(alpha: 0.4)
-              : const Color(0xFFEF4444).withValues(alpha: 0.4),
+              ? AppTheme.successColor.withValues(alpha: 0.4)
+              : AppTheme.errorColor.withValues(alpha: 0.4),
         ),
       ),
       child: Text(
         available ? 'Stock' : 'Sin stock',
         style: TextStyle(
-          color: available ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+          color: available ? AppTheme.successColor : AppTheme.errorColor,
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
@@ -402,6 +454,7 @@ class _ColorDots extends StatelessWidget {
     'celeste': Color(0xFF38BDF8),
     'cafe': Color(0xFF92400E),
     'beige': Color(0xFFD4A373),
+    'terracota': Color(0xFF8B4513),
   };
 
   Color _colorFor(String name) {
@@ -409,7 +462,7 @@ class _ColorDots extends StatelessWidget {
     for (final entry in _colorMap.entries) {
       if (lower.contains(entry.key)) return entry.value;
     }
-    return const Color(0xFF475569);
+    return const Color(0xFF8B7355);
   }
 
   @override
@@ -425,14 +478,16 @@ class _ColorDots extends StatelessWidget {
             decoration: BoxDecoration(
               color: _colorFor(c),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24),
+              border: Border.all(
+                color: AppTheme.terracotta.withValues(alpha: 0.2),
+              ),
             ),
           ),
         ),
         if (colors.length > 5)
           Text(
             '+${colors.length - 5}',
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+            style: const TextStyle(color: AppTheme.brownMedium, fontSize: 10),
           ),
       ],
     );

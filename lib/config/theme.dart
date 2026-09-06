@@ -1,53 +1,62 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const primaryColor = Color(0xFF3B82F6);
-  static const secondaryColor = Color(0xFF8B5CF6);
-  static const backgroundColor = Color(0xFF090D16);
-  static const surfaceColor = Color(0xFF121826);
-  static const cardColor = Color(0xFF1A2234);
-  static const textColor = Color(0xFFF8FAFC);
-  static const textMutedColor = Color(0xFF94A3B8);
-  static const errorColor = Color(0xFFEF4444);
-  static const successColor = Color(0xFF22C55E);
+  // ── VESTA Warm Palette (synchronized with Angular web) ──
+  static const terracotta = Color(0xFF8B4513);
+  static const terracottaLight = Color(0xFFC4956A);
+  static const brown = Color(0xFF2C1810);
+  static const brownMedium = Color(0xFF8B7355);
+  static const cream = Color(0xFFF5F0E8);
+  static const creamLight = Color(0xFFFAF7F2);
+  static const surface = Color(0xFFFFFFFF);
+  static const errorColor = Color(0xFFDC2626);
+  static const successColor = Color(0xFF16A34A);
 
-  static ThemeData get darkTheme {
+  static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: backgroundColor,
-      primaryColor: primaryColor,
-      colorScheme: const ColorScheme.dark(
-        primary: primaryColor,
-        secondary: secondaryColor,
-        surface: surfaceColor,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: cream,
+      primaryColor: terracotta,
+      colorScheme: const ColorScheme.light(
+        primary: terracotta,
+        secondary: terracottaLight,
+        surface: surface,
         error: errorColor,
         onPrimary: Colors.white,
-        onSurface: textColor,
+        onSurface: brown,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: surface,
+        foregroundColor: brown,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        centerTitle: false,
       ),
       cardTheme: CardThemeData(
-        color: cardColor,
+        color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Colors.white10),
+          side: BorderSide(color: terracotta.withValues(alpha: 0.12)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF0F172A),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        fillColor: creamLight,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white12),
+          borderSide: BorderSide(color: terracotta.withValues(alpha: 0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white12),
+          borderSide: BorderSide(color: terracotta.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryColor, width: 1.5),
+          borderSide: const BorderSide(color: terracotta, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -57,12 +66,13 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: errorColor, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: textMutedColor),
-        hintStyle: const TextStyle(color: Color(0xFF475569)),
+        labelStyle: const TextStyle(color: brownMedium),
+        hintStyle: TextStyle(color: brownMedium.withValues(alpha: 0.6)),
+        prefixIconColor: brownMedium,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: terracotta,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -75,6 +85,22 @@ class AppTheme {
           ),
         ),
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: terracotta,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: creamLight,
+        selectedColor: terracotta,
+        labelStyle: const TextStyle(fontSize: 13),
+        side: BorderSide(color: terracotta.withValues(alpha: 0.2)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      dividerColor: terracotta.withValues(alpha: 0.1),
+      iconTheme: const IconThemeData(color: brownMedium),
     );
   }
 }

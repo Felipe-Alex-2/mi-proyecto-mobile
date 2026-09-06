@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../catalog/catalog_screen.dart';
 
@@ -15,25 +16,35 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.checkroom_rounded, color: Color(0xFF3B82F6), size: 22),
+            Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
             SizedBox(width: 8),
             Text(
-              'Prendas & Stock',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              'FashionStore',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppTheme.brown,
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
+            icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
             tooltip: 'Cerrar sesión',
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  backgroundColor: const Color(0xFF1A2234),
-                  title: const Text('Cerrar Sesión'),
-                  content: const Text('¿Estás seguro de que deseas salir?'),
+                  backgroundColor: AppTheme.surface,
+                  title: const Text(
+                    'Cerrar Sesión',
+                    style: TextStyle(color: AppTheme.brown),
+                  ),
+                  content: const Text(
+                    '¿Estás seguro de que deseas salir?',
+                    style: TextStyle(color: AppTheme.brownMedium),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
@@ -41,7 +52,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
+                        backgroundColor: AppTheme.errorColor,
                       ),
                       onPressed: () {
                         Navigator.of(ctx).pop();
@@ -65,13 +76,15 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.terracotta,
+                    AppTheme.terracotta.withValues(alpha: 0.85),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,25 +97,22 @@ class HomeScreen extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF22C55E).withValues(alpha: 0.3),
-                          ),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.check_circle_outline,
-                              color: Color(0xFF22C55E),
+                              color: Colors.white.withValues(alpha: 0.9),
                               size: 14,
                             ),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text(
                               'Sesión Activa',
                               style: TextStyle(
-                                color: Color(0xFF4ADE80),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -114,17 +124,18 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '¡Hola, ${user?.fullName ?? "Usuario"}!',
+                    '¡Bienvenido, ${user?.fullName ?? "Usuario"}!',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Explora el catálogo de prendas y consulta el stock disponible en cada sucursal.',
                     style: TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 14,
                     ),
                   ),
@@ -136,8 +147,8 @@ class HomeScreen extends StatelessWidget {
             // Quick access - Catalog
             _QuickAccessCard(
               icon: Icons.grid_view_rounded,
-              iconColor: const Color(0xFF3B82F6),
-              iconBg: const Color(0xFF1E3A5F),
+              iconColor: AppTheme.terracotta,
+              iconBg: AppTheme.terracotta.withValues(alpha: 0.1),
               title: 'Ver Catálogo',
               subtitle: 'Explora todas las prendas disponibles',
               label: 'Abrir',
@@ -149,8 +160,8 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _QuickAccessCard(
               icon: Icons.inventory_2_outlined,
-              iconColor: const Color(0xFF8B5CF6),
-              iconBg: const Color(0xFF2D1B69),
+              iconColor: AppTheme.terracottaLight,
+              iconBg: AppTheme.terracottaLight.withValues(alpha: 0.1),
               title: 'Stock por Sucursal',
               subtitle: 'Consulta disponibilidad en tiempo real',
               label: 'Consultar',
@@ -170,60 +181,29 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.badge_outlined, color: Color(0xFF3B82F6)),
+                        Icon(Icons.badge_outlined, color: AppTheme.terracotta),
                         SizedBox(width: 8),
                         Text(
                           'Tu Perfil',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: AppTheme.brown,
                           ),
                         ),
                       ],
                     ),
-                    const Divider(height: 24, color: Colors.white10),
+                    Divider(
+                      height: 24,
+                      color: AppTheme.terracotta.withValues(alpha: 0.12),
+                    ),
                     _buildInfoRow('Nombre', user?.fullName ?? '-'),
                     const SizedBox(height: 12),
                     _buildInfoRow('Email', user?.email ?? '-'),
                     const SizedBox(height: 12),
-                    _buildInfoRow('Estado', user?.isActive == true ? 'Activo ✅' : 'Inactivo'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Ecosystem card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.layers_outlined, color: Color(0xFF8B5CF6)),
-                        SizedBox(width: 8),
-                        Text(
-                          'Ecosistema Conectado',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24, color: Colors.white10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: const [
-                        Chip(label: Text('⚡ FastAPI Backend')),
-                        Chip(label: Text('🅰️ Angular Web')),
-                        Chip(label: Text('📱 Flutter Móvil')),
-                        Chip(label: Text('🐘 PostgreSQL 16')),
-                        Chip(label: Text('🔐 Secure Storage')),
-                      ],
+                    _buildInfoRow(
+                      'Estado',
+                      user?.isActive == true ? 'Activo ✅' : 'Inactivo',
                     ),
                   ],
                 ),
@@ -241,7 +221,7 @@ class HomeScreen extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+          style: const TextStyle(color: AppTheme.brownMedium, fontSize: 14),
         ),
         Flexible(
           child: Text(
@@ -251,7 +231,7 @@ class HomeScreen extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w600,
               fontFamily: isCode ? 'monospace' : null,
-              color: isCode ? const Color(0xFF60A5FA) : Colors.white,
+              color: isCode ? AppTheme.terracotta : AppTheme.brown,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -287,9 +267,11 @@ class _QuickAccessCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2234),
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(
+            color: AppTheme.terracotta.withValues(alpha: 0.12),
+          ),
         ),
         child: Row(
           children: [
@@ -311,13 +293,14 @@ class _QuickAccessCard extends StatelessWidget {
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
+                      color: AppTheme.brown,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: AppTheme.brownMedium,
                       fontSize: 12,
                     ),
                   ),
@@ -327,9 +310,11 @@ class _QuickAccessCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.15),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: iconColor.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 label,

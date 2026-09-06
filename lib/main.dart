@@ -35,8 +35,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Prendas & Stock',
-      theme: AppTheme.darkTheme,
+      title: 'FashionStore VESTA',
+      theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
     );

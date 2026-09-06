@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authService.errorMessage!),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -60,6 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: AppTheme.brown,
       ),
       body: SafeArea(
         child: Center(
@@ -80,12 +82,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         height: 64,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                            colors: [AppTheme.terracotta, AppTheme.terracottaLight],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                              color: AppTheme.terracotta.withValues(alpha: 0.35),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -108,6 +110,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.5,
+                        color: AppTheme.brown,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -116,7 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF94A3B8),
+                        color: AppTheme.brownMedium,
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -215,9 +218,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     // Submit Button
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
-                      ),
                       onPressed: isAuthenticating ? null : _submit,
                       child: isAuthenticating
                           ? const SizedBox(
