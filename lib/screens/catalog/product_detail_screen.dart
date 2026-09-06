@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../config/theme.dart';
 import '../../models/product.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final product = widget.product;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090D16),
+      backgroundColor: AppTheme.cream,
       body: CustomScrollView(
         slivers: [
           _buildAppBar(context, product),
@@ -77,7 +78,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return SliverAppBar(
       expandedHeight: 300,
       pinned: true,
-      backgroundColor: const Color(0xFF121826),
+      backgroundColor: AppTheme.surface,
+      foregroundColor: AppTheme.brown,
       leading: GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Container(
@@ -99,9 +101,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final url = product.imageUrl;
     if (url == null || url.isEmpty) {
       return Container(
-        color: const Color(0xFF121826),
+        color: AppTheme.creamLight,
         child: const Center(
-          child: Icon(Icons.checkroom_rounded, size: 80, color: Color(0xFF3B82F6)),
+          child: Icon(
+            Icons.checkroom_rounded,
+            size: 80,
+            color: AppTheme.terracotta,
+          ),
         ),
       );
     }
@@ -113,9 +119,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
       return Container(
-        color: const Color(0xFF121826),
+        color: AppTheme.creamLight,
         child: const Center(
-          child: Icon(Icons.checkroom_rounded, size: 80, color: Color(0xFF3B82F6)),
+          child: Icon(
+            Icons.checkroom_rounded,
+            size: 80,
+            color: AppTheme.terracotta,
+          ),
         ),
       );
     });
@@ -134,15 +144,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                      color: AppTheme.terracotta.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       product.category,
                       style: const TextStyle(
-                        color: Color(0xFF60A5FA),
+                        color: AppTheme.terracotta,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -154,6 +167,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: AppTheme.brown,
                     ),
                   ),
                 ],
@@ -167,7 +181,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         if (product.description.isNotEmpty)
           Text(
             product.description,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14, height: 1.5),
+            style: const TextStyle(
+              color: AppTheme.brownMedium,
+              fontSize: 14,
+              height: 1.5,
+            ),
           ),
         const SizedBox(height: 16),
         _buildPriceRow(product),
@@ -179,7 +197,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_filteredVariants.isEmpty) {
       return const Text(
         'Sin precio disponible',
-        style: TextStyle(color: Color(0xFF94A3B8)),
+        style: TextStyle(color: AppTheme.brownMedium),
       );
     }
     final prices = _filteredVariants.map((v) => v.price).toList()..sort();
@@ -194,13 +212,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           style: const TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF3B82F6),
+            color: AppTheme.terracotta,
           ),
         ),
         const Spacer(),
         Text(
           'Stock total: $_totalStockForSelection',
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+          style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
         ),
       ],
     );
@@ -221,22 +239,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onTap: () => setState(() => _selectedColor = color),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
-                      : const Color(0xFF1A2234),
+                      ? AppTheme.terracotta.withValues(alpha: 0.1)
+                      : AppTheme.surface,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF3B82F6) : Colors.white12,
+                    color: isSelected
+                        ? AppTheme.terracotta
+                        : AppTheme.terracotta.withValues(alpha: 0.15),
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
                 child: Text(
                   color,
                   style: TextStyle(
-                    color: isSelected ? const Color(0xFF60A5FA) : const Color(0xFF94A3B8),
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? AppTheme.terracotta
+                        : AppTheme.brownMedium,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                     fontSize: 13,
                   ),
                 ),
@@ -267,11 +293,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 height: 52,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
-                      : const Color(0xFF1A2234),
+                      ? AppTheme.terracotta.withValues(alpha: 0.1)
+                      : AppTheme.surface,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF3B82F6) : Colors.white12,
+                    color: isSelected
+                        ? AppTheme.terracotta
+                        : AppTheme.terracotta.withValues(alpha: 0.15),
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
@@ -279,8 +307,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Text(
                     size,
                     style: TextStyle(
-                      color: isSelected ? const Color(0xFF60A5FA) : const Color(0xFF94A3B8),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? AppTheme.terracotta
+                          : AppTheme.brownMedium,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                       fontSize: 13,
                     ),
                   ),
@@ -300,27 +331,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final branchMap = <String, int>{};
     for (final variant in _filteredVariants) {
       for (final stock in variant.stocks) {
-        branchMap[stock.branchName] = (branchMap[stock.branchName] ?? 0) + stock.quantity;
+        branchMap[stock.branchName] =
+            (branchMap[stock.branchName] ?? 0) + stock.quantity;
       }
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2234),
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(
+          color: AppTheme.terracotta.withValues(alpha: 0.12),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.store_outlined, color: Color(0xFF3B82F6), size: 18),
+              Icon(
+                Icons.store_outlined,
+                color: AppTheme.terracotta,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Text(
                 'Disponibilidad por sucursal',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: AppTheme.brown,
+                ),
               ),
             ],
           ),
@@ -328,7 +370,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (branchMap.isEmpty)
             const Text(
               'Sin información de stock',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              style: TextStyle(color: AppTheme.brownMedium, fontSize: 13),
             )
           else
             ...branchMap.entries.map(
@@ -348,7 +390,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         const Text(
           'Variantes',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.brown,
+          ),
         ),
         const SizedBox(height: 12),
         ..._filteredVariants.map((v) => _VariantTile(variant: v)),
@@ -356,17 +402,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A2234),
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(
+                color: AppTheme.terracotta.withValues(alpha: 0.12),
+              ),
             ),
             child: const Row(
               children: [
-                Icon(Icons.info_outline_rounded, color: Color(0xFF94A3B8), size: 18),
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: AppTheme.brownMedium,
+                  size: 18,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'No hay variantes para esta combinación',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  style: TextStyle(
+                    color: AppTheme.brownMedium,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -380,13 +435,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.brown,
+          ),
         ),
         if (selected != null) ...[
           const SizedBox(width: 8),
           Text(
             selected,
-            style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 14),
+            style: const TextStyle(
+              color: AppTheme.terracotta,
+              fontSize: 14,
+            ),
           ),
         ],
       ],
@@ -404,13 +466,13 @@ class _StockStatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: available
-            ? const Color(0xFF22C55E).withValues(alpha: 0.15)
-            : const Color(0xFFEF4444).withValues(alpha: 0.15),
+            ? AppTheme.successColor.withValues(alpha: 0.1)
+            : AppTheme.errorColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: available
-              ? const Color(0xFF22C55E).withValues(alpha: 0.4)
-              : const Color(0xFFEF4444).withValues(alpha: 0.4),
+              ? AppTheme.successColor.withValues(alpha: 0.4)
+              : AppTheme.errorColor.withValues(alpha: 0.4),
         ),
       ),
       child: Row(
@@ -418,14 +480,14 @@ class _StockStatusBadge extends StatelessWidget {
         children: [
           Icon(
             available ? Icons.check_circle_outline : Icons.cancel_outlined,
-            color: available ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+            color: available ? AppTheme.successColor : AppTheme.errorColor,
             size: 14,
           ),
           const SizedBox(width: 4),
           Text(
             available ? 'Disponible' : 'Agotado',
             style: TextStyle(
-              color: available ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+              color: available ? AppTheme.successColor : AppTheme.errorColor,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -449,31 +511,40 @@ class _BranchStockRow extends StatelessWidget {
 
     Color quantityColor;
     if (isOut) {
-      quantityColor = const Color(0xFFF87171);
+      quantityColor = AppTheme.errorColor;
     } else if (isLow) {
-      quantityColor = const Color(0xFFFBBF24);
+      quantityColor = const Color(0xFFD97706); // amber for low stock
     } else {
-      quantityColor = const Color(0xFF4ADE80);
+      quantityColor = AppTheme.successColor;
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          const Icon(Icons.location_on_outlined, size: 16, color: Color(0xFF94A3B8)),
+          const Icon(
+            Icons.location_on_outlined,
+            size: 16,
+            color: AppTheme.brownMedium,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               branchName,
-              style: const TextStyle(color: Color(0xFFF8FAFC), fontSize: 13),
+              style: const TextStyle(
+                color: AppTheme.brown,
+                fontSize: 13,
+              ),
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: quantityColor.withValues(alpha: 0.15),
+              color: quantityColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: quantityColor.withValues(alpha: 0.4)),
+              border: Border.all(
+                color: quantityColor.withValues(alpha: 0.4),
+              ),
             ),
             child: Text(
               isOut ? 'Sin stock' : '$quantity uds.',
@@ -500,10 +571,12 @@ class _VariantTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A2234),
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: variant.isAvailable ? Colors.white10 : Colors.white.withValues(alpha: 0.04),
+          color: variant.isAvailable
+              ? AppTheme.terracotta.withValues(alpha: 0.12)
+              : AppTheme.terracotta.withValues(alpha: 0.06),
         ),
       ),
       child: Row(
@@ -517,13 +590,18 @@ class _VariantTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: variant.isAvailable ? Colors.white : const Color(0xFF475569),
+                    color: variant.isAvailable
+                        ? AppTheme.brown
+                        : AppTheme.brownMedium,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'SKU: ${variant.sku}',
-                  style: const TextStyle(color: Color(0xFF475569), fontSize: 11),
+                  style: TextStyle(
+                    color: AppTheme.brownMedium.withValues(alpha: 0.7),
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -534,7 +612,9 @@ class _VariantTile extends StatelessWidget {
               Text(
                 '\$${variant.price.toStringAsFixed(0)}',
                 style: TextStyle(
-                  color: variant.isAvailable ? const Color(0xFF3B82F6) : const Color(0xFF475569),
+                  color: variant.isAvailable
+                      ? AppTheme.terracotta
+                      : AppTheme.brownMedium,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -543,7 +623,9 @@ class _VariantTile extends StatelessWidget {
               Text(
                 '${variant.totalStock} en stock',
                 style: TextStyle(
-                  color: variant.isAvailable ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                  color: variant.isAvailable
+                      ? AppTheme.brownMedium
+                      : AppTheme.brownMedium.withValues(alpha: 0.6),
                   fontSize: 11,
                 ),
               ),

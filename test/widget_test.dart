@@ -21,7 +21,7 @@ void main() {
           ChangeNotifierProvider<AuthService>.value(value: authService),
         ],
         child: MaterialApp(
-          theme: AppTheme.darkTheme,
+          theme: AppTheme.lightTheme,
           home: const LoginScreen(),
         ),
       ),
