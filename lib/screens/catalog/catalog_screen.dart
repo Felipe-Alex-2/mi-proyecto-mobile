@@ -54,7 +54,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
         actions: [
           Consumer<CatalogService>(
-            builder: (_, catalog, __) => IconButton(
+            builder: (_, catalog, _) => IconButton(
               icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
               tooltip: 'Actualizar',
               onPressed: catalog.loadProducts,
@@ -73,7 +73,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   Widget _buildSearchAndFilter() {
     return Consumer<CatalogService>(
-      builder: (_, catalog, __) => Container(
+      builder: (_, catalog, _) => Container(
         color: AppTheme.surface,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
@@ -143,7 +143,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   Widget _buildProductList() {
     return Consumer<CatalogService>(
-      builder: (_, catalog, __) {
+      builder: (_, catalog, _) {
         if (catalog.status == CatalogStatus.loading) {
           return const Center(
             child: Column(
@@ -393,7 +393,7 @@ class _ProductCard extends StatelessWidget {
     return Image.network(
       url,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         color: AppTheme.creamLight,
         child: const Icon(
           Icons.checkroom_rounded,

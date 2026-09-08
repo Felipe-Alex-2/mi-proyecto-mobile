@@ -117,7 +117,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {}
     }
-    return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
+    return Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) {
       return Container(
         color: AppTheme.creamLight,
         child: const Center(

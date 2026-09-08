@@ -23,24 +23,27 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
-    final hasToken = await _storageService.hasToken();
-    if (!hasToken) {
-      _status = AuthStatus.unauthenticated;
-      notifyListeners();
-      return;
-    }
-
     try {
+      final hasToken = await _storageService.hasToken();
+      if (!hasToken) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+        return;
+      }
+
       final data = await _apiService.get('/users/me');
       _currentUser = User.fromJson(data);
       _status = AuthStatus.authenticated;
     } catch (_) {
-      await _storageService.clearTokens();
+      try {
+        await _storageService.clearTokens();
+      } catch (_) {}
       _currentUser = null;
       _status = AuthStatus.unauthenticated;
     }
     notifyListeners();
   }
+
 
   Future<bool> login(String email, String password) async {
     _status = AuthStatus.authenticating;
