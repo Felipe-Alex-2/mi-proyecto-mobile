@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'screens/auth/login_screen.dart';
@@ -6,6 +6,8 @@ import 'screens/home/home_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/catalog_service.dart';
+import 'services/cart_service.dart';
+import 'services/reservation_service.dart';
 import 'services/storage_service.dart';
 
 void main() {
@@ -15,6 +17,8 @@ void main() {
   final apiService = ApiService(storageService);
   final authService = AuthService(apiService, storageService);
   final catalogService = CatalogService(apiService);
+  final cartService = CartService(apiService);
+  final reservationService = ReservationService(apiService);
 
   runApp(
     MultiProvider(
@@ -23,6 +27,8 @@ void main() {
         Provider<ApiService>.value(value: apiService),
         ChangeNotifierProvider<AuthService>.value(value: authService),
         ChangeNotifierProvider<CatalogService>.value(value: catalogService),
+        ChangeNotifierProvider<CartService>.value(value: cartService),
+        ChangeNotifierProvider<ReservationService>.value(value: reservationService),
       ],
       child: const MyApp(),
     ),

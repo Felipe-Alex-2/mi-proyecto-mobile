@@ -1,4 +1,4 @@
-class Stock {
+﻿class Stock {
   final String id;
   final String branchId;
   final String branchName;
@@ -60,6 +60,7 @@ class Product {
   final String name;
   final String description;
   final String category;
+  final String gender;
   final String? imageUrl;
   final bool isActive;
   final List<ProductVariant> variants;
@@ -69,6 +70,7 @@ class Product {
     required this.name,
     required this.description,
     required this.category,
+    this.gender = 'Unisex',
     this.imageUrl,
     required this.isActive,
     required this.variants,
@@ -101,6 +103,7 @@ class Product {
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       category: json['category']?.toString() ?? '',
+      gender: json['gender']?.toString() ?? 'Unisex',
       imageUrl: json['image_url']?.toString(),
       isActive: json['is_active'] as bool? ?? true,
       variants: variantsJson

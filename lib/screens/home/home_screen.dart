@@ -1,11 +1,97 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
+import '../../services/cart_service.dart';
 import '../catalog/catalog_screen.dart';
+import '../cart/cart_screen.dart';
+import '../reservations/reservations_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CartService>().loadCart();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartService = context.watch<CartService>();
+    final cartCount = cartService.itemCount;
+
+    final pages = [
+      _HomeDashboardTab(onNavigateToTab: (index) => setState(() => _currentIndex = index)),
+      const CatalogScreen(),
+      const CartScreen(),
+      const ReservationsScreen(),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppTheme.surface,
+        selectedItemColor: AppTheme.terracotta,
+        unselectedItemColor: AppTheme.brownMedium,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontSize: 12),
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home_rounded),
+            label: 'Inicio',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.checkroom_outlined),
+            activeIcon: Icon(Icons.checkroom_rounded),
+            label: 'Catálogo',
+          ),
+          BottomNavigationBarItem(
+            icon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text('$cartCount'),
+              backgroundColor: AppTheme.terracotta,
+              child: const Icon(Icons.shopping_bag_outlined),
+            ),
+            activeIcon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text('$cartCount'),
+              backgroundColor: AppTheme.terracotta,
+              child: const Icon(Icons.shopping_bag_rounded),
+            ),
+            label: 'Carrito',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.event_note_outlined),
+            activeIcon: Icon(Icons.event_note_rounded),
+            label: 'Reservas',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeDashboardTab extends StatelessWidget {
+  final ValueChanged<int> onNavigateToTab;
+
+  const _HomeDashboardTab({required this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +105,7 @@ class HomeScreen extends StatelessWidget {
             Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
             SizedBox(width: 8),
             Text(
-              'FashionStore',
+              'FashionStore VESTA',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -37,28 +123,17 @@ class HomeScreen extends StatelessWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   backgroundColor: AppTheme.surface,
-                  title: const Text(
-                    'Cerrar Sesión',
-                    style: TextStyle(color: AppTheme.brown),
-                  ),
-                  content: const Text(
-                    '¿Estás seguro de que deseas salir?',
-                    style: TextStyle(color: AppTheme.brownMedium),
-                  ),
+                  title: const Text('Cerrar Sesión', style: TextStyle(color: AppTheme.brown)),
+                  content: const Text('¿Estás seguro de que deseas salir?', style: TextStyle(color: AppTheme.brownMedium)),
                   actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Cancelar'),
-                    ),
+                    TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.errorColor,
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         authService.logout();
                       },
-                      child: const Text('Salir'),
+                      child: const Text('Cerrar Sesión'),
                     ),
                   ],
                 ),
@@ -72,30 +147,32 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Welcome Card
+            // Banner
             Container(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.terracotta,
-                    AppTheme.terracotta.withValues(alpha: 0.85),
-                  ],
+                gradient: const LinearGradient(
+                  colors: [AppTheme.brown, AppTheme.terracotta],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.brown.withValues(alpha: 0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -103,19 +180,11 @@ class HomeScreen extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              color: Colors.white.withValues(alpha: 0.9),
-                              size: 14,
-                            ),
+                            Icon(Icons.check_circle_outline, color: Colors.white.withValues(alpha: 0.9), size: 14),
                             const SizedBox(width: 6),
                             Text(
                               'Sesión Activa',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
@@ -124,55 +193,52 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '¡Bienvenido, ${user?.fullName ?? "Usuario"}!',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    '¡Hola, ${user?.fullName ?? "Cliente"}!',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Explora el catálogo de prendas y consulta el stock disponible en cada sucursal.',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
-                    ),
+                    'Explora nuestro catálogo en Bolivianos (Bs), arma tu carrito y reserva tus prendas favoritas para probártelas en tienda física.',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
 
-            // Quick access - Catalog
+            // Quick access cards
             _QuickAccessCard(
               icon: Icons.grid_view_rounded,
               iconColor: AppTheme.terracotta,
               iconBg: AppTheme.terracotta.withValues(alpha: 0.1),
-              title: 'Ver Catálogo',
-              subtitle: 'Explora todas las prendas disponibles',
-              label: 'Abrir',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CatalogScreen()),
-              ),
+              title: 'Catálogo Digital (CU11)',
+              subtitle: 'Prendas, filtros de talla, color y precios en Bs',
+              label: 'Explorar',
+              onTap: () => onNavigateToTab(1),
             ),
             const SizedBox(height: 12),
             _QuickAccessCard(
-              icon: Icons.inventory_2_outlined,
-              iconColor: AppTheme.terracottaLight,
-              iconBg: AppTheme.terracottaLight.withValues(alpha: 0.1),
-              title: 'Stock por Sucursal',
-              subtitle: 'Consulta disponibilidad en tiempo real',
-              label: 'Consultar',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CatalogScreen()),
-              ),
+              icon: Icons.shopping_bag_outlined,
+              iconColor: Colors.teal,
+              iconBg: Colors.teal.withValues(alpha: 0.1),
+              title: 'Mi Carrito de Compras (CU12)',
+              subtitle: 'Prepara tu selección antes de visitar la tienda',
+              label: 'Ver Carrito',
+              onTap: () => onNavigateToTab(2),
+            ),
+            const SizedBox(height: 12),
+            _QuickAccessCard(
+              icon: Icons.event_note_rounded,
+              iconColor: Colors.deepPurple,
+              iconBg: Colors.deepPurple.withValues(alpha: 0.1),
+              title: 'Mis Reservas de Prueba (CU13)',
+              subtitle: 'Consulta el estado y tiempo de validez de tus prendas',
+              label: 'Ver Reservas',
+              onTap: () => onNavigateToTab(3),
             ),
             const SizedBox(height: 24),
 
-            // Profile Info Card
+            // Profile Card
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -184,27 +250,19 @@ class HomeScreen extends StatelessWidget {
                         Icon(Icons.badge_outlined, color: AppTheme.terracotta),
                         SizedBox(width: 8),
                         Text(
-                          'Tu Perfil',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.brown,
-                          ),
+                          'Tu Cuenta',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.brown),
                         ),
                       ],
                     ),
-                    Divider(
-                      height: 24,
-                      color: AppTheme.terracotta.withValues(alpha: 0.12),
-                    ),
+                    Divider(height: 24, color: AppTheme.terracotta.withValues(alpha: 0.12)),
                     _buildInfoRow('Nombre', user?.fullName ?? '-'),
                     const SizedBox(height: 12),
                     _buildInfoRow('Email', user?.email ?? '-'),
                     const SizedBox(height: 12),
-                    _buildInfoRow(
-                      'Estado',
-                      user?.isActive == true ? 'Activo ✅' : 'Inactivo',
-                    ),
+                    _buildInfoRow('Moneda del Sistema', 'Bolivianos (Bs)'),
+                    const SizedBox(height: 12),
+                    _buildInfoRow('Estado', user?.isActive == true ? 'Activo ✅' : 'Inactivo'),
                   ],
                 ),
               ),
@@ -215,27 +273,12 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isCode = false}) {
+  Widget _buildInfoRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: const TextStyle(color: AppTheme.brownMedium, fontSize: 14),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              fontFamily: isCode ? 'monospace' : null,
-              color: isCode ? AppTheme.terracotta : AppTheme.brown,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
+        Text(label, style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13)),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.brown)),
       ],
     );
   }
@@ -269,18 +312,13 @@ class _QuickAccessCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.terracotta.withValues(alpha: 0.12),
-          ),
+          border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.12)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
               child: Icon(icon, color: iconColor, size: 24),
             ),
             const SizedBox(width: 16),
@@ -288,42 +326,20 @@ class _QuickAccessCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: AppTheme.brown,
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown)),
                   const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: AppTheme.brownMedium,
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text(subtitle, style: const TextStyle(color: AppTheme.brownMedium, fontSize: 12)),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: iconColor.withValues(alpha: 0.3),
-                ),
+                border: Border.all(color: iconColor.withValues(alpha: 0.3)),
               ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: iconColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: Text(label, style: TextStyle(color: iconColor, fontSize: 12, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

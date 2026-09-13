@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -30,6 +30,139 @@ class _CatalogScreenState extends State<CatalogScreen> {
     super.dispose();
   }
 
+  void _showFilterModal(BuildContext context) {
+    final catalog = context.read<CatalogService>();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filtros Avanzados',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.brown,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          catalog.clearFilters();
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text(
+                          'Limpiar',
+                          style: TextStyle(color: AppTheme.terracotta),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Género',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.brownMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: ['Todos', 'Hombre', 'Mujer', 'Unisex'].map((g) {
+                      final isSelected = catalog.selectedGender == g;
+                      return ChoiceChip(
+                        label: Text(g),
+                        selected: isSelected,
+                        selectedColor: AppTheme.terracotta,
+                        backgroundColor: AppTheme.creamLight,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppTheme.brownMedium,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        onSelected: (_) {
+                          catalog.setGender(g);
+                          setModalState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Ordenar por',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.brownMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      {'key': 'newest', 'label': 'Más recientes'},
+                      {'key': 'price_asc', 'label': 'Precio: menor a mayor'},
+                      {'key': 'price_desc', 'label': 'Precio: mayor a menor'},
+                      {'key': 'name_asc', 'label': 'Nombre A-Z'},
+                    ].map((s) {
+                      final isSelected = catalog.sortBy == s['key'];
+                      return ChoiceChip(
+                        label: Text(s['label']!),
+                        selected: isSelected,
+                        selectedColor: AppTheme.terracotta,
+                        backgroundColor: AppTheme.creamLight,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppTheme.brownMedium,
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        onSelected: (_) {
+                          catalog.setSortBy(s['key']!);
+                          setModalState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.terracotta,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Aplicar Filtros',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -43,7 +176,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
             SizedBox(width: 8),
             Text(
-              'Catálogo',
+              'Catálogo Digital',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -53,6 +186,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: AppTheme.terracotta),
+            tooltip: 'Filtros avanzados',
+            onPressed: () => _showFilterModal(context),
+          ),
           Consumer<CatalogService>(
             builder: (_, catalog, _) => IconButton(
               icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
@@ -78,27 +216,34 @@ class _CatalogScreenState extends State<CatalogScreen> {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           children: [
-            // Search field
-            TextField(
-              controller: _searchController,
-              onChanged: catalog.setSearch,
-              decoration: InputDecoration(
-                hintText: 'Buscar prendas...',
-                prefixIcon:
-                    const Icon(Icons.search_rounded, color: AppTheme.brownMedium),
-                suffixIcon: catalog.searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(
-                          Icons.clear_rounded,
-                          color: AppTheme.brownMedium,
-                        ),
-                        onPressed: () {
-                          _searchController.clear();
-                          catalog.setSearch('');
-                        },
-                      )
-                    : null,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: catalog.setSearch,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar prendas, SKU...',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.brownMedium),
+                      suffixIcon: catalog.searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, color: AppTheme.brownMedium),
+                              onPressed: () {
+                                _searchController.clear();
+                                catalog.setSearch('');
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  icon: const Icon(Icons.filter_list_rounded, color: AppTheme.terracotta),
+                  tooltip: 'Filtros',
+                  onPressed: () => _showFilterModal(context),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             // Category chips
@@ -117,12 +262,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         selectedColor: AppTheme.terracotta,
                         backgroundColor: AppTheme.creamLight,
                         labelStyle: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppTheme.brownMedium,
+                          color: isSelected ? Colors.white : AppTheme.brownMedium,
                           fontSize: 13,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
                         side: BorderSide(
                           color: isSelected
@@ -151,10 +293,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
               children: [
                 CircularProgressIndicator(color: AppTheme.terracotta),
                 SizedBox(height: 16),
-                Text(
-                  'Cargando catálogo...',
-                  style: TextStyle(color: AppTheme.brownMedium),
-                ),
+                Text('Cargando catálogo...', style: TextStyle(color: AppTheme.brownMedium)),
               ],
             ),
           );
@@ -167,28 +306,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.wifi_off_rounded,
-                    size: 64,
-                    color: AppTheme.brownMedium,
-                  ),
+                  const Icon(Icons.wifi_off_rounded, size: 64, color: AppTheme.brownMedium),
                   const SizedBox(height: 16),
                   const Text(
                     'No se pudo cargar el catálogo',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.brown,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     catalog.errorMessage ?? 'Error desconocido',
-                    style: const TextStyle(
-                      color: AppTheme.brownMedium,
-                      fontSize: 13,
-                    ),
+                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -207,56 +335,67 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
         if (products.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.search_off_rounded,
-                  size: 64,
-                  color: AppTheme.brownMedium,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Sin resultados',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.brown,
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.search_off_rounded, size: 64, color: AppTheme.brownMedium),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Sin resultados',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Prueba con otra búsqueda o categoría',
-                  style: TextStyle(color: AppTheme.brownMedium, fontSize: 14),
-                ),
-                if (catalog.searchQuery.isNotEmpty ||
-                    catalog.selectedCategory != 'Todos')
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: TextButton.icon(
+                  const SizedBox(height: 8),
+                  Text(
+                    catalog.searchQuery.isNotEmpty
+                        ? 'No encontramos prendas para "${catalog.searchQuery}"'
+                        : 'No hay prendas disponibles con los filtros actuales.',
+                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (catalog.searchQuery.isNotEmpty || catalog.selectedCategory != 'Todos' || catalog.selectedGender != 'Todos') ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton(
                       onPressed: () {
                         _searchController.clear();
                         catalog.clearFilters();
                       },
-                      icon: const Icon(Icons.filter_list_off_rounded),
-                      label: const Text('Limpiar filtros'),
+                      child: const Text('Limpiar filtros'),
                     ),
-                  ),
-              ],
+                  ],
+                ],
+              ),
             ),
           );
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.72,
+        return RefreshIndicator(
+          color: AppTheme.terracotta,
+          onRefresh: catalog.loadProducts,
+          child: GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.65,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              return _ProductCard(
+                product: products[index],
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductDetailScreen(product: products[index]),
+                    ),
+                  );
+                },
+              );
+            },
           ),
-          itemCount: products.length,
-          itemBuilder: (_, index) => _ProductCard(product: products[index]),
         );
       },
     );
@@ -265,88 +404,105 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
 class _ProductCard extends StatelessWidget {
   final Product product;
+  final VoidCallback onTap;
 
-  const _ProductCard({required this.product});
+  const _ProductCard({required this.product, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProductDetailScreen(product: product),
-        ),
-      ),
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.terracotta.withValues(alpha: 0.12),
-          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.creamLight),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.brown.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Product image
+            // Image
             Expanded(
-              flex: 5,
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-                child: _buildImage(),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _buildImage(),
+                  if (!product.isAvailable)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      child: const Center(
+                        child: Text(
+                          'Agotado',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  if (product.gender.isNotEmpty)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.brown.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          product.gender,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            // Product info
-            Expanded(
-              flex: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+
+            // Info
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (product.category.isNotEmpty)
                     Text(
-                      product.name,
+                      product.category.toUpperCase(),
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppTheme.brown,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.terracotta,
+                        letterSpacing: 0.5,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.category,
-                      style: const TextStyle(
-                        color: AppTheme.brownMedium,
-                        fontSize: 11,
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    product.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Price in Bolivianos (Bs)
+                  Text(
+                    _priceText(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.terracotta,
                     ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _priceText(),
-                            style: const TextStyle(
-                              color: AppTheme.terracotta,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        _StockBadge(available: product.isAvailable),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    // Color dots
-                    if (product.availableColors.isNotEmpty)
-                      _ColorDots(colors: product.availableColors),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildColorDots(),
+                ],
               ),
             ),
           ],
@@ -356,11 +512,11 @@ class _ProductCard extends StatelessWidget {
   }
 
   String _priceText() {
-    if (product.variants.isEmpty) return '\$0';
+    if (product.variants.isEmpty) return 'Bs 0';
     if (product.minPrice == product.maxPrice) {
-      return '\$${product.minPrice.toStringAsFixed(0)}';
+      return 'Bs ${product.minPrice.toStringAsFixed(0)}';
     }
-    return '\$${product.minPrice.toStringAsFixed(0)} - \$${product.maxPrice.toStringAsFixed(0)}';
+    return 'Bs ${product.minPrice.toStringAsFixed(0)} - Bs ${product.maxPrice.toStringAsFixed(0)}';
   }
 
   Widget _buildImage() {
@@ -368,11 +524,7 @@ class _ProductCard extends StatelessWidget {
     if (url == null || url.isEmpty) {
       return Container(
         color: AppTheme.creamLight,
-        child: const Icon(
-          Icons.checkroom_rounded,
-          size: 40,
-          color: AppTheme.terracotta,
-        ),
+        child: const Icon(Icons.checkroom_rounded, size: 40, color: AppTheme.terracotta),
       );
     }
     if (url.startsWith('data:image')) {
@@ -380,14 +532,7 @@ class _ProductCard extends StatelessWidget {
         final bytes = base64Decode(url.split(',').last);
         return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {
-        return Container(
-          color: AppTheme.creamLight,
-          child: const Icon(
-            Icons.broken_image_rounded,
-            size: 40,
-            color: AppTheme.brownMedium,
-          ),
-        );
+        return Container(color: AppTheme.creamLight);
       }
     }
     return Image.network(
@@ -395,101 +540,49 @@ class _ProductCard extends StatelessWidget {
       fit: BoxFit.cover,
       errorBuilder: (_, _, _) => Container(
         color: AppTheme.creamLight,
-        child: const Icon(
-          Icons.checkroom_rounded,
-          size: 40,
-          color: AppTheme.terracotta,
-        ),
+        child: const Icon(Icons.checkroom_rounded, size: 40, color: AppTheme.terracotta),
       ),
     );
   }
-}
 
-class _StockBadge extends StatelessWidget {
-  final bool available;
-  const _StockBadge({required this.available});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: available
-            ? AppTheme.successColor.withValues(alpha: 0.1)
-            : AppTheme.errorColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: available
-              ? AppTheme.successColor.withValues(alpha: 0.4)
-              : AppTheme.errorColor.withValues(alpha: 0.4),
-        ),
-      ),
-      child: Text(
-        available ? 'Stock' : 'Sin stock',
-        style: TextStyle(
-          color: available ? AppTheme.successColor : AppTheme.errorColor,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-class _ColorDots extends StatelessWidget {
-  final List<String> colors;
-  const _ColorDots({required this.colors});
-
-  static const _colorMap = {
-    'negro': Color(0xFF111827),
-    'blanco': Color(0xFFF8FAFC),
-    'rojo': Color(0xFFEF4444),
-    'azul': Color(0xFF3B82F6),
-    'verde': Color(0xFF22C55E),
-    'amarillo': Color(0xFFEAB308),
-    'naranja': Color(0xFFF97316),
-    'morado': Color(0xFF8B5CF6),
-    'gris': Color(0xFF6B7280),
-    'rosa': Color(0xFFEC4899),
-    'celeste': Color(0xFF38BDF8),
-    'cafe': Color(0xFF92400E),
-    'beige': Color(0xFFD4A373),
-    'terracota': Color(0xFF8B4513),
-  };
-
-  Color _colorFor(String name) {
-    final lower = name.toLowerCase();
-    for (final entry in _colorMap.entries) {
-      if (lower.contains(entry.key)) return entry.value;
+  Color _parseColor(String name) {
+    switch (name.toLowerCase()) {
+      case 'rojo': return Colors.red;
+      case 'azul': return Colors.blue;
+      case 'verde': return Colors.green;
+      case 'negro': return Colors.black;
+      case 'blanco': return Colors.white;
+      case 'gris': return Colors.grey;
+      case 'café':
+      case 'cafe': return Colors.brown;
+      case 'amarillo': return Colors.amber;
+      default: return AppTheme.terracotta;
     }
-    return const Color(0xFF8B7355);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final shown = colors.take(5).toList();
+  Widget _buildColorDots() {
+    final colors = product.availableColors;
+    if (colors.isEmpty) return const SizedBox.shrink();
     return Row(
       children: [
-        ...shown.map(
-          (c) => Container(
-            width: 12,
-            height: 12,
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: _colorFor(c),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppTheme.terracotta.withValues(alpha: 0.2),
+        ...colors.take(4).map((c) => Container(
+              width: 10,
+              height: 10,
+              margin: const EdgeInsets.only(right: 3),
+              decoration: BoxDecoration(
+                color: _parseColor(c),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppTheme.brownMedium.withValues(alpha: 0.3), width: 0.5),
               ),
-            ),
-          ),
-        ),
-        if (colors.length > 5)
+            )),
+        if (colors.length > 4)
           Text(
-            '+${colors.length - 5}',
-            style: const TextStyle(color: AppTheme.brownMedium, fontSize: 10),
+            '+${colors.length - 4}',
+            style: const TextStyle(fontSize: 10, color: AppTheme.brownMedium),
           ),
       ],
     );
   }
 }
+
+

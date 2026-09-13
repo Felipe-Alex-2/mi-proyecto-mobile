@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import '../models/product.dart';
 import 'api_service.dart';
 
@@ -12,6 +12,10 @@ class CatalogService extends ChangeNotifier {
   String? _errorMessage;
   String _searchQuery = '';
   String _selectedCategory = 'Todos';
+  String _selectedGender = 'Todos';
+  String _sortBy = 'newest';
+  double? _minPrice;
+  double? _maxPrice;
 
   CatalogService(this._apiService);
 
@@ -20,6 +24,10 @@ class CatalogService extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String get searchQuery => _searchQuery;
   String get selectedCategory => _selectedCategory;
+  String get selectedGender => _selectedGender;
+  String get sortBy => _sortBy;
+  double? get minPrice => _minPrice;
+  double? get maxPrice => _maxPrice;
 
   List<String> get categories {
     final cats = _products.map((p) => p.category).where((c) => c.isNotEmpty).toSet().toList()
@@ -28,16 +36,34 @@ class CatalogService extends ChangeNotifier {
   }
 
   List<Product> get _filteredProducts {
-    return _products.where((product) {
+    var list = _products.where((product) {
       final matchesSearch = _searchQuery.isEmpty ||
           product.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          product.category.toLowerCase().contains(_searchQuery.toLowerCase());
+          product.category.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          product.variants.any((v) => v.sku.toLowerCase().contains(_searchQuery.toLowerCase()));
 
       final matchesCategory =
           _selectedCategory == 'Todos' || product.category == _selectedCategory;
 
-      return matchesSearch && matchesCategory && product.isActive;
+      final matchesGender = _selectedGender == 'Todos' ||
+          product.gender.toLowerCase() == _selectedGender.toLowerCase() ||
+          product.gender.toLowerCase() == 'unisex';
+
+      final matchesMin = _minPrice == null || product.maxPrice >= _minPrice!;
+      final matchesMax = _maxPrice == null || product.minPrice <= _maxPrice!;
+
+      return matchesSearch && matchesCategory && matchesGender && matchesMin && matchesMax && product.isActive;
     }).toList();
+
+    if (_sortBy == 'price_asc') {
+      list.sort((a, b) => a.minPrice.compareTo(b.minPrice));
+    } else if (_sortBy == 'price_desc') {
+      list.sort((a, b) => b.maxPrice.compareTo(a.maxPrice));
+    } else if (_sortBy == 'name_asc') {
+      list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
+
+    return list;
   }
 
   Future<void> loadProducts() async {
@@ -80,9 +106,29 @@ class CatalogService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setGender(String gender) {
+    _selectedGender = gender;
+    notifyListeners();
+  }
+
+  void setSortBy(String sort) {
+    _sortBy = sort;
+    notifyListeners();
+  }
+
+  void setPriceRange(double? min, double? max) {
+    _minPrice = min;
+    _maxPrice = max;
+    notifyListeners();
+  }
+
   void clearFilters() {
     _searchQuery = '';
     _selectedCategory = 'Todos';
+    _selectedGender = 'Todos';
+    _sortBy = 'newest';
+    _minPrice = null;
+    _maxPrice = null;
     notifyListeners();
   }
 }
