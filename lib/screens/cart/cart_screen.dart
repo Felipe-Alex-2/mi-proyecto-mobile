@@ -94,9 +94,11 @@ class _CartScreenState extends State<CartScreen> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: selectedBranchId,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.storefront_rounded, color: AppTheme.terracotta, size: 20),
                     ),
                     items: branches.map((b) {
                       return DropdownMenuItem(

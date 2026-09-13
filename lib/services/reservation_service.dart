@@ -75,16 +75,32 @@ class ReservationService extends ChangeNotifier {
   }
 
   Future<List<BranchOption>> getActiveBranches() async {
+    // 1. Intentar directamente desde /branches?is_active=true
+    try {
+      final data = await _apiService.get('/branches?is_active=true');
+      if (data is List) {
+        final list = data
+            .map((b) => BranchOption.fromJson(b as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e) {
+      debugPrint('Error loading active branches from /branches: $e');
+    }
+
+    // 2. Fallback a /catalog/filters
     try {
       final data = await _apiService.get('/catalog/filters');
       final branchesJson = data['branches'] as List<dynamic>? ?? [];
-      return branchesJson
+      final list = branchesJson
           .map((b) => BranchOption.fromJson(b as Map<String, dynamic>))
           .toList();
+      if (list.isNotEmpty) return list;
     } catch (e) {
-      debugPrint('Error loading active branches: $e');
-      return [];
+      debugPrint('Error loading active branches from /catalog/filters: $e');
     }
+
+    return [];
   }
 
   Future<List<Map<String, dynamic>>> getVariantAvailability(String variantId) async {

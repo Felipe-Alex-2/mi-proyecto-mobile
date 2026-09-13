@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -27,31 +27,106 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     final colors = widget.product.availableColors;
     final sizes = widget.product.availableSizes;
-    if (colors.isNotEmpty) _selectedColor = colors.first;
-    if (sizes.isNotEmpty) _selectedSize = sizes.first;
+    if (colors.isNotEmpty) {
+      _selectedColor = colors.first;
+    }
+    if (sizes.isNotEmpty) {
+      _selectedSize = sizes.first;
+    }
   }
 
   List<ProductVariant> get _filteredVariants {
     return widget.product.variants.where((v) {
-      final matchColor = _selectedColor == null || v.color == _selectedColor;
-      final matchSize = _selectedSize == null || v.size == _selectedSize;
+      final matchColor = _selectedColor == null || v.color.trim().toLowerCase() == _selectedColor!.trim().toLowerCase();
+      final matchSize = _selectedSize == null || v.size.trim().toLowerCase() == _selectedSize!.trim().toLowerCase();
       return matchColor && matchSize;
     }).toList();
   }
 
   ProductVariant? get _selectedVariant {
     final list = _filteredVariants;
-    return list.isNotEmpty ? list.first : (widget.product.variants.isNotEmpty ? widget.product.variants.first : null);
+    if (list.isNotEmpty) return list.first;
+    return widget.product.variants.isNotEmpty ? widget.product.variants.first : null;
   }
 
   int get _totalStockForSelection =>
       _filteredVariants.fold(0, (sum, v) => sum + v.totalStock);
 
+  void _showFloatingFeedback({
+    required String message,
+    required bool isSuccess,
+    VoidCallback? onAction,
+    String? actionLabel,
+  }) {
+    // Limpia snacks previos para respuesta instantánea
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        backgroundColor: isSuccess ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+          child: Row(
+            children: [
+              Icon(
+                isSuccess ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    onAction();
+                  },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _addToCart() async {
     final variant = _selectedVariant;
     if (variant == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una variante disponible')),
+      _showFloatingFeedback(
+        message: 'Selecciona una variante disponible',
+        isSuccess: false,
       );
       return;
     }
@@ -60,23 +135,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       await context.read<CartService>().addToCart(variant.id, quantity: 1);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('¡${widget.product.name} agregada al carrito!'),
-          backgroundColor: Colors.green.shade700,
-          action: SnackBarAction(
-            label: 'Ver Carrito',
-            textColor: Colors.white,
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
-            },
-          ),
-        ),
+      _showFloatingFeedback(
+        message: '¡${widget.product.name} agregada al carrito!',
+        isSuccess: true,
+        actionLabel: 'Ver Carrito',
+        onAction: () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+        },
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al agregar: $e'), backgroundColor: Colors.red),
+      _showFloatingFeedback(
+        message: 'Error al agregar: $e',
+        isSuccess: false,
       );
     } finally {
       if (mounted) setState(() => _isAddingToCart = false);
@@ -86,8 +157,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _showReserveDialog() async {
     final variant = _selectedVariant;
     if (variant == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una variante disponible para reservar')),
+      _showFloatingFeedback(
+        message: 'Selecciona una variante disponible para reservar',
+        isSuccess: false,
       );
       return;
     }
@@ -97,13 +169,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!mounted) return;
 
     if (branches.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay sucursales disponibles')),
+      _showFloatingFeedback(
+        message: 'No hay sucursales disponibles en este momento',
+        isSuccess: false,
       );
       return;
     }
 
+    // Default branch preference: priorizar la que tenga stock de la variante actual
     String selectedBranchId = branches.first.id;
+    final branchesWithStock = variant.stocks.where((s) => s.quantity > 0).map((s) => s.branchId).toSet();
+    final matchingBranch = branches.firstWhere(
+      (b) => branchesWithStock.contains(b.id),
+      orElse: () => branches.first,
+    );
+    selectedBranchId = matchingBranch.id;
+
     final notesCtrl = TextEditingController();
     bool isSubmitting = false;
 
@@ -142,20 +223,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Prenda: ${widget.product.name} (Talla: ${variant.size}, Color: ${variant.color})',
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.terracotta, fontSize: 13),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.terracotta.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${widget.product.name} • Color: ${variant.color} • Talla: ${variant.size}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.terracotta, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   const Text('Sucursal donde deseas probártela *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: selectedBranchId,
+                    isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.storefront_rounded, color: AppTheme.terracotta, size: 20),
                     ),
-                    items: branches.map((b) => DropdownMenuItem(value: b.id, child: Text('${b.name} (${b.city})'))).toList(),
+                    items: branches.map((b) {
+                      final hasLocalStock = branchesWithStock.contains(b.id);
+                      return DropdownMenuItem(
+                        value: b.id,
+                        child: Text(
+                          '${b.name} (${b.city})${hasLocalStock ? " • Con Stock" : ""}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: hasLocalStock ? FontWeight.bold : FontWeight.normal,
+                            color: hasLocalStock ? AppTheme.brown : AppTheme.brownMedium,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                     onChanged: (val) {
                       if (val != null) setModalState(() => selectedBranchId = val);
                     },
@@ -190,12 +302,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 if (!ctx.mounted) return;
                                 Navigator.pop(ctx);
 
+                                if (!mounted) return;
                                 showDialog(
                                   context: context,
                                   builder: (dCtx) => AlertDialog(
                                     backgroundColor: AppTheme.surface,
-                                    title: const Text('¡Reserva Confirmada!'),
-                                    content: Text('Código: ${newRes.reservationCode}\nTus prendas estarán reservadas por 48 horas.'),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, color: Colors.green),
+                                        SizedBox(width: 8),
+                                        Text('¡Reserva Confirmada!'),
+                                      ],
+                                    ),
+                                    content: Text('Código: ${newRes.reservationCode}\nTus prendas estarán reservadas por 48 horas en la sucursal seleccionada.'),
                                     actions: [
                                       TextButton(
                                         onPressed: () {
@@ -209,8 +328,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 );
                               } catch (e) {
                                 setModalState(() => isSubmitting = false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+                                _showFloatingFeedback(
+                                  message: '$e',
+                                  isSuccess: false,
                                 );
                               }
                             },
@@ -429,7 +549,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Row(
       children: [
-        // Price displayed in Bolivianos (Bs)
         Text(
           minP == maxP
               ? 'Bs ${minP.toStringAsFixed(2)}'
@@ -461,33 +580,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Color', _selectedColor),
+        _sectionTitle('Seleccionar Color', _selectedColor),
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: product.availableColors.map((color) {
-            final isSelected = _selectedColor == color;
+            final isSelected = _selectedColor?.trim().toLowerCase() == color.trim().toLowerCase();
             return GestureDetector(
-              onTap: () => setState(() => _selectedColor = color),
+              onTap: () {
+                setState(() => _selectedColor = color);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.terracotta.withValues(alpha: 0.1) : AppTheme.surface,
-                  borderRadius: BorderRadius.circular(10),
+                  color: isSelected ? AppTheme.terracotta : AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected ? AppTheme.terracotta : AppTheme.creamLight,
-                    width: isSelected ? 1.5 : 1,
+                    width: isSelected ? 2 : 1,
                   ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.terracotta.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
                 ),
-                child: Text(
-                  color,
-                  style: TextStyle(
-                    color: isSelected ? AppTheme.terracotta : AppTheme.brown,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isSelected) ...[
+                      const Icon(Icons.check_rounded, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      color,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : AppTheme.brown,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -501,22 +640,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Talla', _selectedSize),
+        _sectionTitle('Seleccionar Talla', _selectedSize),
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,
           runSpacing: 10,
           children: product.availableSizes.map((size) {
-            final isSelected = _selectedSize == size;
+            final isSelected = _selectedSize?.trim().toLowerCase() == size.trim().toLowerCase();
             return GestureDetector(
-              onTap: () => setState(() => _selectedSize = size),
+              onTap: () {
+                setState(() => _selectedSize = size);
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? AppTheme.terracotta : AppTheme.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isSelected ? AppTheme.terracotta : AppTheme.creamLight),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? AppTheme.terracotta : AppTheme.creamLight,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.terracotta.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
                 ),
                 child: Text(
                   size,
@@ -605,7 +758,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final variant = product.variants[index];
-            return _VariantTile(variant: variant);
+            final isSelected = _selectedVariant?.id == variant.id;
+            return InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedColor = variant.color;
+                  _selectedSize = variant.size;
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: _VariantTile(
+                variant: variant,
+                isSelected: isSelected,
+              ),
+            );
           },
         ),
       ],
@@ -616,7 +782,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Row(
       children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.brown)),
-        if (selected != null) ...[
+        if (selected != null && selected.isNotEmpty) ...[
           const SizedBox(width: 8),
           Text(selected, style: const TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 15)),
         ],
@@ -627,17 +793,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
 class _VariantTile extends StatelessWidget {
   final ProductVariant variant;
+  final bool isSelected;
 
-  const _VariantTile({required this.variant});
+  const _VariantTile({
+    required this.variant,
+    this.isSelected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: isSelected ? AppTheme.terracotta.withValues(alpha: 0.08) : AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.creamLight),
+        border: Border.all(
+          color: isSelected ? AppTheme.terracotta : AppTheme.creamLight,
+          width: isSelected ? 1.5 : 1,
+        ),
       ),
       child: Row(
         children: [
@@ -645,9 +818,21 @@ class _VariantTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${variant.color} · Talla ${variant.size}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.brown, fontSize: 13),
+                Row(
+                  children: [
+                    if (isSelected) ...[
+                      const Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.terracotta),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      '${variant.color} · Talla ${variant.size}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? AppTheme.terracotta : AppTheme.brown,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
                 Text('SKU: ${variant.sku}', style: const TextStyle(color: AppTheme.brownMedium, fontSize: 11)),
               ],
@@ -656,7 +841,6 @@ class _VariantTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Price in Bs
               Text(
                 'Bs ${variant.price.toStringAsFixed(2)}',
                 style: const TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 13),
@@ -676,5 +860,3 @@ class _VariantTile extends StatelessWidget {
     );
   }
 }
-
-
