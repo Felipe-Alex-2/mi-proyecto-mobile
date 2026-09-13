@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
+import '../../utils/validators.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -32,15 +33,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final authService = context.read<AuthService>();
     final success = await authService.register(
-      _emailController.text,
+      _emailController.text.trim(),
       _passwordController.text,
-      _nameController.text,
+      _nameController.text.trim(),
     );
 
     if (!mounted) return;
 
     if (success) {
-      Navigator.of(context).pop(); // Go back or auth status will navigate
+      Navigator.of(context).pop(); // Back to login (which will auto-navigate if authenticated)
     } else if (authService.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -61,7 +62,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: AppTheme.brown,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.brown),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: SafeArea(
         child: Center(
@@ -81,13 +85,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.terracotta, AppTheme.terracottaLight],
-                          ),
+                          color: AppTheme.terracotta,
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.terracotta.withValues(alpha: 0.35),
+                              color: AppTheme.terracotta.withOpacity(0.3),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -132,15 +134,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Alex Felipe',
                         prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingresa tu nombre';
-                        }
-                        if (value.trim().length < 2) {
-                          return 'Mínimo 2 caracteres';
-                        }
-                        return null;
-                      },
+                      validator: (v) => AppValidators.validateRequired(v, 'tu nombre', minLength: 2),
                     ),
                     const SizedBox(height: 16),
 
@@ -153,15 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'ejemplo@correo.com',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingresa tu correo';
-                        }
-                        if (!value.contains('@') || !value.contains('.')) {
-                          return 'Correo inválido';
-                        }
-                        return null;
-                      },
+                      validator: AppValidators.validateEmail,
                     ),
                     const SizedBox(height: 16),
 
@@ -186,15 +172,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           },
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresa tu contraseña';
-                        }
-                        if (value.length < 8) {
-                          return 'Mínimo 8 caracteres';
-                        }
-                        return null;
-                      },
+                      validator: AppValidators.validatePassword,
+                    ),
+                    const SizedBox(height: 6),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Text(
+                        'Requisitos: 8+ caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 símbolo especial.',
+                        style: TextStyle(fontSize: 11.5, color: AppTheme.brownMedium),
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -208,6 +194,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         prefixIcon: Icon(Icons.lock_reset_rounded),
                       ),
                       validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Confirma tu contraseña';
+                        }
                         if (value != _passwordController.text) {
                           return 'Las contraseñas no coinciden';
                         }
@@ -229,6 +218,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             )
                           : const Text('Crear Cuenta'),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Login Link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          '¿Ya tienes una cuenta? ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.brownMedium,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'Inicia sesión',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.terracotta,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

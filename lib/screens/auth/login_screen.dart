@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
+import '../../utils/validators.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,8 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final authService = context.read<AuthService>();
     final success = await authService.login(
-      _emailController.text,
-      _passwordController.text,
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
     );
 
     if (!mounted) return;
@@ -70,13 +71,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.terracotta, AppTheme.terracottaLight],
-                          ),
+                          color: AppTheme.terracotta,
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.terracotta.withValues(alpha: 0.35),
+                              color: AppTheme.terracotta.withOpacity(0.3),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -122,15 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         hintText: 'ejemplo@correo.com',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingresa tu correo';
-                        }
-                        if (!value.contains('@') || !value.contains('.')) {
-                          return 'Correo inválido';
-                        }
-                        return null;
-                      },
+                      validator: AppValidators.validateEmail,
                     ),
                     const SizedBox(height: 16),
 
@@ -155,15 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Ingresa tu contraseña';
-                        }
-                        if (value.length < 8) {
-                          return 'Mínimo 8 caracteres';
-                        }
-                        return null;
-                      },
+                      validator: (value) => AppValidators.validateRequired(value, 'tu contraseña'),
                     ),
                     const SizedBox(height: 28),
 
@@ -179,28 +162,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('Ingresar'),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward_rounded, size: 18),
-                              ],
-                            ),
+                          : const Text('Iniciar Sesión'),
                     ),
                     const SizedBox(height: 24),
 
                     // Register Link
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          '¿No tienes cuenta? ',
-                          style: TextStyle(color: AppTheme.brownMedium),
+                          '¿No tienes una cuenta? ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.brownMedium,
+                          ),
                         ),
-                        TextButton(
-                          onPressed: () {
+                        GestureDetector(
+                          onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => const RegisterScreen(),
@@ -210,8 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: const Text(
                             'Regístrate gratis',
                             style: TextStyle(
-                              color: AppTheme.terracotta,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
+                              color: AppTheme.terracotta,
                             ),
                           ),
                         ),
