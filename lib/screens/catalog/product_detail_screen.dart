@@ -18,6 +18,7 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  String? _selectedVariantId;
   String? _selectedColor;
   String? _selectedSize;
   bool _isAddingToCart = false;
@@ -44,6 +45,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   ProductVariant? get _selectedVariant {
+    if (_selectedVariantId != null) {
+      for (final v in widget.product.variants) {
+        if (v.id == _selectedVariantId) return v;
+      }
+    }
     final list = _filteredVariants;
     if (list.isNotEmpty) return list.first;
     return widget.product.variants.isNotEmpty ? widget.product.variants.first : null;
@@ -540,33 +546,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildPriceRow(Product product) {
-    if (_filteredVariants.isEmpty) {
-      return const Text('Sin precio disponible', style: TextStyle(color: AppTheme.brownMedium));
-    }
-    final prices = _filteredVariants.map((v) => v.price).toList()..sort();
-    final minP = prices.first;
-    final maxP = prices.last;
+    final curVar = _selectedVariant;
+    final curPrice = (curVar != null && curVar.price > 0)
+        ? curVar.price
+        : (product.basePrice > 0 ? product.basePrice : product.minPrice);
+    final availableStock = curVar != null ? curVar.totalStock : _totalStockForSelection;
 
     return Row(
       children: [
         Text(
-          minP == maxP
-              ? 'Bs ${minP.toStringAsFixed(2)}'
-              : 'Bs ${minP.toStringAsFixed(2)} – Bs ${maxP.toStringAsFixed(2)}',
+          'Bs ${curPrice.toStringAsFixed(2)}',
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
         ),
         const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _totalStockForSelection > 0 ? Colors.green.shade50 : Colors.red.shade50,
+            color: availableStock > 0 ? Colors.green.shade50 : Colors.red.shade50,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _totalStockForSelection > 0 ? Colors.green.shade300 : Colors.red.shade300),
+            border: Border.all(color: availableStock > 0 ? Colors.green.shade300 : Colors.red.shade300),
           ),
           child: Text(
-            _totalStockForSelection > 0 ? '$_totalStockForSelection en stock' : 'Sin stock',
+            availableStock > 0 ? '$availableStock en stock' : 'Sin stock',
             style: TextStyle(
-              color: _totalStockForSelection > 0 ? Colors.green.shade800 : Colors.red.shade800,
+              color: availableStock > 0 ? Colors.green.shade800 : Colors.red.shade800,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
@@ -589,7 +592,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             final isSelected = _selectedColor?.trim().toLowerCase() == color.trim().toLowerCase();
             return GestureDetector(
               onTap: () {
-                setState(() => _selectedColor = color);
+                setState(() {
+                  _selectedColor = color;
+                  for (final v in widget.product.variants) {
+                    if (v.color.trim().toLowerCase() == color.trim().toLowerCase()) {
+                      _selectedVariantId = v.id;
+                      if (v.size.isNotEmpty) _selectedSize = v.size;
+                      break;
+                    }
+                  }
+                });
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -649,7 +661,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             final isSelected = _selectedSize?.trim().toLowerCase() == size.trim().toLowerCase();
             return GestureDetector(
               onTap: () {
-                setState(() => _selectedSize = size);
+                setState(() {
+                  _selectedSize = size;
+                  for (final v in widget.product.variants) {
+                    final colorMatches = _selectedColor == null || v.color.trim().toLowerCase() == _selectedColor!.trim().toLowerCase();
+                    if (v.size.trim().toLowerCase() == size.trim().toLowerCase() && colorMatches) {
+                      _selectedVariantId = v.id;
+                      if (v.color.isNotEmpty) _selectedColor = v.color;
+                      break;
+                    }
+                  }
+                });
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -762,14 +784,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             return InkWell(
               onTap: () {
                 setState(() {
-                  _selectedColor = variant.color;
-                  _selectedSize = variant.size;
+                  _selectedVariantId = variant.id;
+                  _selectedColor = variant.color.isNotEmpty ? variant.color : null;
+                  _selectedSize = variant.size.isNotEmpty ? variant.size : null;
                 });
               },
               borderRadius: BorderRadius.circular(10),
               child: _VariantTile(
                 variant: variant,
                 isSelected: isSelected,
+                fallbackPrice: product.basePrice,
               ),
             );
           },
@@ -794,10 +818,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 class _VariantTile extends StatelessWidget {
   final ProductVariant variant;
   final bool isSelected;
+  final double fallbackPrice;
 
   const _VariantTile({
     required this.variant,
     this.isSelected = false,
+    this.fallbackPrice = 0.0,
   });
 
   @override
@@ -825,7 +851,7 @@ class _VariantTile extends StatelessWidget {
                       const SizedBox(width: 4),
                     ],
                     Text(
-                      '${variant.color} · Talla ${variant.size}',
+                      '${variant.color.isNotEmpty ? variant.color : "Estándar"} · Talla ${variant.size.isNotEmpty ? variant.size : "U"}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isSelected ? AppTheme.terracotta : AppTheme.brown,
@@ -842,7 +868,7 @@ class _VariantTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'Bs ${variant.price.toStringAsFixed(2)}',
+                'Bs ${(variant.price > 0 ? variant.price : fallbackPrice).toStringAsFixed(2)}',
                 style: const TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 13),
               ),
               Text(

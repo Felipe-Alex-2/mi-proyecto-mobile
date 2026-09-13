@@ -42,14 +42,27 @@ class ProductVariant {
 
   bool get isAvailable => totalStock > 0;
 
-  factory ProductVariant.fromJson(Map<String, dynamic> json) {
+  factory ProductVariant.fromJson(Map<String, dynamic> json, {double defaultPrice = 0.0}) {
     final stocksJson = json['stocks'] as List<dynamic>? ?? [];
+    // Color can be color_name, color, or Color object
+    String colorName = json['color_name']?.toString() ?? json['color']?.toString() ?? '';
+    // Size can be size_code, size_name, or size
+    String sizeName = json['size_code']?.toString() ?? json['size_name']?.toString() ?? json['size']?.toString() ?? '';
+    
+    // Price can be price_override, price, or product default price
+    double variantPrice = defaultPrice;
+    if (json['price_override'] != null) {
+      variantPrice = (json['price_override'] as num).toDouble();
+    } else if (json['price'] != null && (json['price'] as num).toDouble() > 0) {
+      variantPrice = (json['price'] as num).toDouble();
+    }
+
     return ProductVariant(
       id: json['id']?.toString() ?? '',
       sku: json['sku']?.toString() ?? '',
-      color: json['color']?.toString() ?? '',
-      size: json['size']?.toString() ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      color: colorName,
+      size: sizeName,
+      price: variantPrice,
       stocks: stocksJson.map((s) => Stock.fromJson(s as Map<String, dynamic>)).toList(),
     );
   }
@@ -60,6 +73,7 @@ class Product {
   final String name;
   final String description;
   final String category;
+  final double basePrice;
   final String gender;
   final String? imageUrl;
   final bool isActive;
@@ -70,6 +84,7 @@ class Product {
     required this.name,
     required this.description,
     required this.category,
+    this.basePrice = 0.0,
     this.gender = 'Unisex',
     this.imageUrl,
     required this.isActive,
@@ -81,13 +96,15 @@ class Product {
   bool get isAvailable => totalStock > 0;
 
   double get minPrice {
-    if (variants.isEmpty) return 0;
-    return variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
+    if (variants.isEmpty) return basePrice;
+    final prices = variants.map((v) => v.price > 0 ? v.price : basePrice).toList();
+    return prices.reduce((a, b) => a < b ? a : b);
   }
 
   double get maxPrice {
-    if (variants.isEmpty) return 0;
-    return variants.map((v) => v.price).reduce((a, b) => a > b ? a : b);
+    if (variants.isEmpty) return basePrice;
+    final prices = variants.map((v) => v.price > 0 ? v.price : basePrice).toList();
+    return prices.reduce((a, b) => a > b ? a : b);
   }
 
   List<String> get availableColors =>
@@ -98,16 +115,20 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     final variantsJson = json['variants'] as List<dynamic>? ?? [];
+    final prodPrice = (json['price'] as num?)?.toDouble() ?? 0.0;
+    final categoryName = json['category_name']?.toString() ?? json['category']?.toString() ?? '';
+
     return Product(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      category: json['category']?.toString() ?? '',
+      category: categoryName,
+      basePrice: prodPrice,
       gender: json['gender']?.toString() ?? 'Unisex',
       imageUrl: json['image_url']?.toString(),
       isActive: json['is_active'] as bool? ?? true,
       variants: variantsJson
-          .map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
+          .map((v) => ProductVariant.fromJson(v as Map<String, dynamic>, defaultPrice: prodPrice))
           .toList(),
     );
   }
