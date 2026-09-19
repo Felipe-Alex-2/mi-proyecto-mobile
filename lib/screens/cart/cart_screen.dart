@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -157,9 +157,13 @@ class _CartScreenState extends State<CartScreen> {
                                 _showSuccessDialog(context, newRes);
                               } catch (e) {
                                 setSheetState(() => isSubmitting = false);
+                                final errStr = '$e'.replaceAll('Exception: ', '');
+                                final displayMsg = errStr.toLowerCase().contains('stock')
+                                    ? 'Esta sucursal no tiene stock disponible'
+                                    : errStr;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('$e'),
+                                    content: Text(displayMsg),
                                     backgroundColor: Colors.red.shade700,
                                   ),
                                 );

@@ -265,7 +265,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       return DropdownMenuItem(
                         value: b.id,
                         child: Text(
-                          '${b.name} (${b.city})${hasLocalStock ? " • Con Stock" : ""}',
+                          '${b.name} (${b.city})${hasLocalStock ? " • Disponible" : " • Sin stock"}',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: hasLocalStock ? FontWeight.bold : FontWeight.normal,
@@ -278,6 +278,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       if (val != null) setModalState(() => selectedBranchId = val);
                     },
                   ),
+                  if (!branchesWithStock.contains(selectedBranchId)) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: Colors.red.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Esta sucursal no tiene stock disponible',
+                              style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   const Text('Nota adicional (Opcional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown)),
                   const SizedBox(height: 8),
@@ -296,6 +319,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onPressed: isSubmitting
                           ? null
                           : () async {
+                              if (!branchesWithStock.contains(selectedBranchId)) {
+                                _showFloatingFeedback(
+                                  message: 'Esta sucursal no tiene stock disponible',
+                                  isSuccess: false,
+                                );
+                                return;
+                              }
                               setModalState(() => isSubmitting = true);
                               try {
                                 final newRes = await resService.createReservation(
@@ -567,7 +597,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             border: Border.all(color: availableStock > 0 ? Colors.green.shade300 : Colors.red.shade300),
           ),
           child: Text(
-            availableStock > 0 ? '$availableStock en stock' : 'Sin stock',
+            availableStock > 0 ? 'Disponible' : 'No disponible',
             style: TextStyle(
               color: availableStock > 0 ? Colors.green.shade800 : Colors.red.shade800,
               fontWeight: FontWeight.bold,
@@ -736,13 +766,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 10),
           ...variant.stocks.map((s) {
             final isAvailable = s.quantity > 0;
-            final isLow = s.quantity > 0 && s.quantity <= 5;
-            final badgeColor = !isAvailable
-                ? Colors.red.shade700
-                : (isLow ? Colors.orange.shade800 : Colors.green.shade700);
-            final badgeText = !isAvailable
-                ? 'Sin stock'
-                : (isLow ? 'Pocas unidades (${s.quantity})' : 'Disponible (${s.quantity} uds.)');
+            final badgeColor = isAvailable ? Colors.green.shade700 : Colors.red.shade700;
+            final badgeText = isAvailable ? 'Disponible' : 'No disponible';
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -872,7 +897,7 @@ class _VariantTile extends StatelessWidget {
                 style: const TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 13),
               ),
               Text(
-                '${variant.totalStock} uds.',
+                variant.isAvailable ? 'Disponible' : 'No disponible',
                 style: TextStyle(
                   color: variant.isAvailable ? Colors.green.shade700 : Colors.red.shade700,
                   fontSize: 11,
