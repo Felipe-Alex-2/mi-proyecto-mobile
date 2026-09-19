@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import '../models/reservation.dart';
 import 'api_service.dart';
 
@@ -52,6 +52,52 @@ class ReservationService extends ChangeNotifier {
       final newRes = Reservation.fromJson(data);
       _reservations.insert(0, newRes);
       return newRes;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> createPayPalReservationOrder({
+    required String branchId,
+    required List<Map<String, dynamic>> items,
+    String? customerNotes,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final body = {
+        'branch_id': branchId,
+        'items': items,
+        if (customerNotes != null && customerNotes.trim().isNotEmpty)
+          'customer_notes': customerNotes.trim(),
+      };
+
+      final data = await _apiService.post('/reservations/paypal-order', body: body);
+      return Map<String, dynamic>.from(data);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Reservation> capturePayPalReservationOrder(String orderId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final data = await _apiService.post('/reservations/paypal-capture', body: {
+        'order_id': orderId,
+      });
+      final updated = Reservation.fromJson(data);
+      final idx = _reservations.indexWhere((r) => r.id == updated.id);
+      if (idx != -1) {
+        _reservations[idx] = updated;
+      } else {
+        _reservations.insert(0, updated);
+      }
+      return updated;
     } finally {
       _isLoading = false;
       notifyListeners();

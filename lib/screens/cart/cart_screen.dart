@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../models/cart.dart';
 import '../../models/reservation.dart';
@@ -26,7 +27,11 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  void _showReservationSheet(BuildContext context, CartResponse cart) async {
+  void _showReservationSheet(
+    BuildContext context,
+    CartResponse cart, {
+    String initialPaymentMethod = 'PAYPAL',
+  }) async {
     final resService = context.read<ReservationService>();
     final cartService = context.read<CartService>();
 
@@ -42,6 +47,7 @@ class _CartScreenState extends State<CartScreen> {
     }
 
     String selectedBranchId = branches.first.id;
+    String selectedPaymentMethod = initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
     final notesController = TextEditingController();
     bool isSubmitting = false;
     String? sheetError;
@@ -56,7 +62,13 @@ class _CartScreenState extends State<CartScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            return Padding(
+            final isPayPal = selectedPaymentMethod == 'PAYPAL';
+            final selectedBranch = branches.firstWhere(
+              (b) => b.id == selectedBranchId,
+              orElse: () => branches.first,
+            );
+
+            return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                 20,
                 20,
@@ -71,7 +83,7 @@ class _CartScreenState extends State<CartScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Reservar para Prueba (CU13)',
+                        'Confirmar Pedido / Reserva',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -84,14 +96,16 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
-                    'Podrás probarte las ${cart.totalItems} prendas en la sucursal seleccionada durante 48 horas sin costo.',
-                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                    'Prendas: ${cart.totalItems} | Total: Bs ${cart.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
+
+                  // Branch selector
                   const Text(
-                    'Selecciona la sucursal *',
+                    '1. Selecciona la sucursal de retiro *',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
                   ),
                   const SizedBox(height: 8),
@@ -118,25 +132,151 @@ class _CartScreenState extends State<CartScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
+
+                  // Payment method selector
                   const Text(
-                    'Comentarios o notas (Opcional)',
+                    '2. Modalidad de Pago *',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+
+                  // PayPal Option
+                  InkWell(
+                    onTap: () {
+                      setSheetState(() {
+                        selectedPaymentMethod = 'PAYPAL';
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isPayPal ? const Color(0xFF0070BA).withValues(alpha: 0.08) : AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isPayPal ? const Color(0xFF0070BA) : Colors.grey.shade300,
+                          width: isPayPal ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isPayPal ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: isPayPal ? const Color(0xFF0070BA) : Colors.grey.shade400,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Row(
+                                  children: [
+                                    Icon(Icons.payment_rounded, color: Color(0xFF0070BA), size: 18),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Pagar por PayPal (Sandbox)',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: Color(0xFF0070BA),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Paga en línea con tu cuenta Sandbox. Tu reserva quedará pagada y lista para recoger en la sucursal.',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // In-Store / Cash Option
+                  InkWell(
+                    onTap: () {
+                      setSheetState(() {
+                        selectedPaymentMethod = 'EFECTIVO';
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: !isPayPal ? AppTheme.terracotta.withValues(alpha: 0.08) : AppTheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: !isPayPal ? AppTheme.terracotta : Colors.grey.shade300,
+                          width: !isPayPal ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            !isPayPal ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: !isPayPal ? AppTheme.terracotta : Colors.grey.shade400,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Row(
+                                  children: [
+                                    Icon(Icons.storefront_rounded, color: AppTheme.terracotta, size: 18),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Reservar para Probar en Tienda',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppTheme.brown,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Reserva gratis por 48h sin pago previo. Te pruebas las prendas en sucursal y abonas en caja.',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Notes
+                  const Text(
+                    'Comentarios o notas (Opcional)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown),
+                  ),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: notesController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Ej. Pasaré por la tarde, talla ajustada...',
+                      hintText: 'Ej. Pasaré por la tarde, separar en mostrador...',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
+
                   if (sheetError != null) ...[
                     const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
                         borderRadius: BorderRadius.circular(10),
@@ -145,14 +285,14 @@ class _CartScreenState extends State<CartScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 20),
-                          const SizedBox(width: 10),
+                          Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 18),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               sheetError!,
                               style: TextStyle(
                                 color: Colors.red.shade800,
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -161,10 +301,12 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
+
+                  // Submit Button
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: isSubmitting
                           ? null
                           : () async {
@@ -180,19 +322,51 @@ class _CartScreenState extends State<CartScreen> {
                                         })
                                     .toList();
 
-                                final newRes = await resService.createReservation(
-                                  branchId: selectedBranchId,
-                                  items: itemsPayload,
-                                  customerNotes: notesController.text,
-                                );
+                                if (isPayPal) {
+                                  // PayPal flow
+                                  final orderData = await resService.createPayPalReservationOrder(
+                                    branchId: selectedBranchId,
+                                    items: itemsPayload,
+                                    customerNotes: notesController.text,
+                                  );
 
-                                // Reload cart as reserved items were cleared
-                                await cartService.loadCart();
+                                  final approvalUrl = orderData['approval_url'] as String?;
+                                  final orderId = orderData['order_id'] as String?;
 
-                                if (!ctx.mounted) return;
-                                Navigator.pop(ctx);
+                                  if (approvalUrl == null || orderId == null) {
+                                    throw Exception('No se pudo generar el enlace de pago de PayPal');
+                                  }
 
-                                _showSuccessDialog(context, newRes);
+                                  // Launch PayPal sandbox checkout in external browser
+                                  final uri = Uri.parse(approvalUrl);
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+
+                                  // Show pending capture dialog
+                                  _showPayPalPendingDialog(
+                                    context,
+                                    orderId,
+                                    selectedBranch.name,
+                                    resService,
+                                    cartService,
+                                  );
+                                } else {
+                                  // Free store reservation flow
+                                  final newRes = await resService.createReservation(
+                                    branchId: selectedBranchId,
+                                    items: itemsPayload,
+                                    customerNotes: notesController.text,
+                                  );
+
+                                  await cartService.loadCart();
+
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+
+                                  _showSuccessDialog(context, newRes, isPaid: false);
+                                }
                               } catch (e) {
                                 final cleanErr = (e is ApiException)
                                     ? e.message
@@ -211,21 +385,30 @@ class _CartScreenState extends State<CartScreen> {
                                 );
                               }
                             },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.terracotta,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: isSubmitting
+                      icon: isSubmitting
+                          ? const SizedBox.shrink()
+                          : Icon(
+                              isPayPal ? Icons.payment_rounded : Icons.check_circle_outline,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                      label: isSubmitting
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text(
-                              'Confirmar Reserva Gratuita',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                          : Text(
+                              isPayPal
+                                  ? 'Pagar con PayPal (Bs ${cart.totalAmount.toStringAsFixed(2)})'
+                                  : 'Confirmar Reserva para Tienda',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
                             ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isPayPal ? const Color(0xFF0070BA) : AppTheme.terracotta,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ],
@@ -237,7 +420,134 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _showSuccessDialog(BuildContext context, Reservation r) {
+  void _showPayPalPendingDialog(
+    BuildContext context,
+    String orderId,
+    String branchName,
+    ReservationService resService,
+    CartService cartService,
+  ) {
+    bool isCapturing = false;
+    String? captureError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dlgCtx) {
+        return StatefulBuilder(
+          builder: (dlgCtx, setDlgState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: const [
+                  Icon(Icons.payment_rounded, color: Color(0xFF0070BA), size: 26),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pago en PayPal Sandbox',
+                      style: TextStyle(color: AppTheme.brown, fontWeight: FontWeight.bold, fontSize: 17),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0070BA).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF0070BA).withValues(alpha: 0.25)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline_rounded, color: Color(0xFF0070BA), size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Se abrió PayPal Sandbox en tu navegador para que apruebes el pago con tu cuenta personal de prueba.',
+                            style: TextStyle(fontSize: 12, color: AppTheme.brown),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Una vez aprobado el pago en PayPal, presiona el botón a continuación para registrar tu reserva pagada:',
+                    style: TextStyle(fontSize: 13, color: AppTheme.brownMedium),
+                  ),
+                  if (captureError != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        captureError!,
+                        style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isCapturing ? null : () => Navigator.pop(dlgCtx),
+                  child: const Text('Cancelar', style: TextStyle(color: AppTheme.brownMedium)),
+                ),
+                ElevatedButton(
+                  onPressed: isCapturing
+                      ? null
+                      : () async {
+                          setDlgState(() {
+                            isCapturing = true;
+                            captureError = null;
+                          });
+                          try {
+                            final capturedRes = await resService.capturePayPalReservationOrder(orderId);
+                            await cartService.loadCart();
+                            if (!dlgCtx.mounted) return;
+                            Navigator.pop(dlgCtx);
+                            _showSuccessDialog(context, capturedRes, isPaid: true);
+                          } catch (e) {
+                            final msg = (e is ApiException) ? e.message : '$e'.replaceAll('Exception: ', '');
+                            setDlgState(() {
+                              isCapturing = false;
+                              captureError = 'Error: $msg';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0070BA),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: isCapturing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Confirmar y Capturar Pago'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSuccessDialog(BuildContext context, Reservation r, {bool isPaid = false}) {
+    final paid = isPaid || r.isPaid;
     showDialog(
       context: context,
       builder: (ctx) {
@@ -245,10 +555,15 @@ class _CartScreenState extends State<CartScreen> {
           backgroundColor: AppTheme.surface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
-            children: const [
-              Icon(Icons.check_circle_rounded, color: Colors.green, size: 28),
-              SizedBox(width: 8),
-              Text('¡Reserva Creada!', style: TextStyle(color: AppTheme.brown, fontWeight: FontWeight.bold)),
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 28),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  paid ? '¡Pago y Reserva Confirmados!' : '¡Reserva Creada!',
+                  style: const TextStyle(color: AppTheme.brown, fontWeight: FontWeight.bold, fontSize: 17),
+                ),
+              ),
             ],
           ),
           content: Column(
@@ -260,13 +575,62 @@ class _CartScreenState extends State<CartScreen> {
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.terracotta),
               ),
               const SizedBox(height: 8),
-              Text('Sucursal: ${r.branchName ?? "Seleccionada"}'),
-              const SizedBox(height: 4),
-              Text('Total estimado: Bs ${r.totalEstimatedAmount.toStringAsFixed(2)}'),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: paid ? Colors.green.shade50 : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: paid ? Colors.green.shade300 : Colors.amber.shade300),
+                    ),
+                    child: Text(
+                      paid ? '✓ Pagado (PayPal)' : '⏳ Pendiente (Pago en Tienda)',
+                      style: TextStyle(
+                        color: paid ? Colors.green.shade800 : Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
-              const Text(
-                'Presenta este código en la tienda física para que el personal prepare tus prendas para prueba en probador.',
-                style: TextStyle(color: AppTheme.brownMedium, fontSize: 12),
+              Text('Sucursal: ${r.branchName ?? "Seleccionada"}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('Total: Bs ${(r.totalAmount ?? r.totalEstimatedAmount).toStringAsFixed(2)}'),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: paid ? Colors.green.shade50 : AppTheme.creamLight.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: paid ? Colors.green.shade200 : AppTheme.creamLight),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      paid ? Icons.store_mall_directory_rounded : Icons.info_outline,
+                      color: paid ? Colors.green.shade700 : AppTheme.terracotta,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        paid
+                            ? 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
+                            : 'Presenta este código en la sucursal ${r.branchName ?? "seleccionada"} para que el personal prepare tus prendas para prueba y pago en caja.',
+                        style: TextStyle(
+                          color: paid ? Colors.green.shade900 : AppTheme.brownMedium,
+                          fontSize: 12,
+                          fontWeight: paid ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -435,16 +799,33 @@ class _CartScreenState extends State<CartScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _showReservationSheet(context, cart),
-                          icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                          onPressed: () => _showReservationSheet(context, cart, initialPaymentMethod: 'PAYPAL'),
+                          icon: const Icon(Icons.payment_rounded, size: 18),
                           label: const Text(
-                            'Reservar para Probar en Tienda',
+                            'Pagar con PayPal (Sandbox)',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.terracotta,
+                            backgroundColor: const Color(0xFF0070BA),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showReservationSheet(context, cart, initialPaymentMethod: 'EFECTIVO'),
+                          icon: const Icon(Icons.storefront_rounded, size: 18, color: AppTheme.terracotta),
+                          label: const Text(
+                            'Reservar para Probar en Tienda (Pagar en tienda)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.terracotta),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.terracotta, width: 1.5),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),

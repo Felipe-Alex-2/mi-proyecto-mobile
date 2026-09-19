@@ -1,4 +1,4 @@
-﻿class ReservationItem {
+class ReservationItem {
   final String id;
   final String variantId;
   final int quantity;
@@ -59,12 +59,25 @@ class Reservation {
   final int totalItems;
   final double totalEstimatedAmount;
 
+  final String? paymentMethod;
+  final String paymentStatus;
+  final String? paypalOrderId;
+  final String? paypalCaptureId;
+  final DateTime? paidAt;
+  final double? totalAmount;
+
   Reservation({
     required this.id,
     required this.reservationCode,
     required this.customerId,
     required this.branchId,
     required this.status,
+    this.paymentMethod,
+    this.paymentStatus = 'PENDING',
+    this.paypalOrderId,
+    this.paypalCaptureId,
+    this.paidAt,
+    this.totalAmount,
     this.customerNotes,
     this.staffNotes,
     required this.createdAt,
@@ -84,6 +97,12 @@ class Reservation {
       customerId: json['customer_id'] ?? '',
       branchId: json['branch_id'] ?? '',
       status: json['status'] ?? 'PENDING',
+      paymentMethod: json['payment_method'],
+      paymentStatus: json['payment_status'] ?? 'PENDING',
+      paypalOrderId: json['paypal_order_id'],
+      paypalCaptureId: json['paypal_capture_id'],
+      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at']) : null,
+      totalAmount: (json['total_amount'] as num?)?.toDouble(),
       customerNotes: json['customer_notes'],
       staffNotes: json['staff_notes'],
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
@@ -105,6 +124,9 @@ class Reservation {
   bool get isCompleted => status == 'COMPLETED';
   bool get isCancelled => status == 'CANCELLED';
   bool get isExpired => status == 'EXPIRED';
+  bool get isPaid => paymentStatus == 'PAID';
+  bool get isPaypal => paymentMethod == 'PAYPAL';
+  bool get isCash => paymentMethod == 'EFECTIVO';
 }
 
 class BranchOption {

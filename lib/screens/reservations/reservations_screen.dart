@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/reservation.dart';
@@ -194,13 +194,36 @@ class _ReservationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Code & Status
+          // Header: Code & Status & Payment Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                reservation.reservationCode,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.brown),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    reservation.reservationCode,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.brown),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: reservation.isPaid ? Colors.green.shade50 : Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: reservation.isPaid ? Colors.green.shade300 : Colors.amber.shade300),
+                    ),
+                    child: Text(
+                      reservation.isPaid ? '✓ Pagado (PayPal)' : '⏳ Pago en Tienda',
+                      style: TextStyle(
+                        color: reservation.isPaid ? Colors.green.shade800 : Colors.amber.shade900,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -214,6 +237,43 @@ class _ReservationCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+
+          // Pickup instruction notice banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: reservation.isPaid ? Colors.green.shade50 : AppTheme.creamLight.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: reservation.isPaid ? Colors.green.shade300 : AppTheme.brownMedium.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  reservation.isPaid ? Icons.check_circle_rounded : Icons.storefront_rounded,
+                  size: 18,
+                  color: reservation.isPaid ? Colors.green.shade700 : AppTheme.terracotta,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    reservation.isPaid
+                        ? 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
+                        : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} para probarse las prendas y pagar en tienda.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: reservation.isPaid ? FontWeight.bold : FontWeight.w500,
+                      color: reservation.isPaid ? Colors.green.shade900 : AppTheme.brown,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
 
@@ -249,7 +309,7 @@ class _ReservationCard extends StatelessWidget {
 
           // Items
           Text(
-            'Prendas a probar (${reservation.totalItems}):',
+            'Prendas de la reserva (${reservation.totalItems}):',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.brownMedium),
           ),
           const SizedBox(height: 6),
@@ -279,16 +339,34 @@ class _ReservationCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total estimado:', style: TextStyle(fontSize: 13, color: AppTheme.brownMedium)),
               Text(
-                'Bs ${reservation.totalEstimatedAmount.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.terracotta),
+                reservation.isPaid ? 'Total Pagado:' : 'Total Estimado:',
+                style: const TextStyle(fontSize: 13, color: AppTheme.brownMedium),
+              ),
+              Text(
+                'Bs ${(reservation.totalAmount ?? reservation.totalEstimatedAmount).toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: reservation.isPaid ? Colors.green.shade700 : AppTheme.terracotta,
+                ),
               ),
             ],
           ),
 
-          // Cancel button if PENDING or CONFIRMED
-          if (reservation.isPending || reservation.isConfirmed) ...[
+          // Cancel button if PENDING or CONFIRMED and NOT paid
+          if (reservation.isPaid) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              alignment: Alignment.center,
+              child: Text(
+                'Pedido pagado vía PayPal · Presentar código en mostrador de sucursal',
+                style: TextStyle(fontSize: 11, color: Colors.green.shade800, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ] else if (reservation.isPending || reservation.isConfirmed) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
