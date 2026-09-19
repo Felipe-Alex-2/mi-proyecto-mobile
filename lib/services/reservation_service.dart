@@ -89,6 +89,7 @@ class ReservationService extends ChangeNotifier {
     try {
       final data = await _apiService.post('/reservations/paypal-capture', body: {
         'order_id': orderId,
+        'paypal_order_id': orderId,
       });
       final updated = Reservation.fromJson(data);
       final idx = _reservations.indexWhere((r) => r.id == updated.id);

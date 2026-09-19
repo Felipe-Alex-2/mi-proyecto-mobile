@@ -1,11 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
+import '../../services/notification_service.dart';
 import '../catalog/catalog_screen.dart';
 import '../cart/cart_screen.dart';
 import '../reservations/reservations_screen.dart';
+import 'widgets/notifications_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CartService>().loadCart();
+      context.read<NotificationService>().loadNotifications();
     });
   }
 
@@ -115,6 +118,39 @@ class _HomeDashboardTab extends StatelessWidget {
           ],
         ),
         actions: [
+          // Globo de Notificaciones con contador en esquina superior derecha
+          Consumer<NotificationService>(
+            builder: (context, notifService, _) {
+              final unread = notifService.unreadCount;
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text(
+                    '$unread',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: Colors.red,
+                  child: const Icon(
+                    Icons.notifications_rounded,
+                    color: AppTheme.brown,
+                    size: 24,
+                  ),
+                ),
+                tooltip: 'Notificaciones ($unread nuevas)',
+                onPressed: () {
+                  NotificationsModal.show(
+                    context,
+                    notifService,
+                    onNavigateToTab: onNavigateToTab,
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
             tooltip: 'Cerrar sesión',

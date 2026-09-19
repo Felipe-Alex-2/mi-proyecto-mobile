@@ -10,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/reservation_service.dart';
 import '../reservations/reservations_screen.dart';
+import '../reservations/widgets/payment_receipt_sheet.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -516,7 +517,16 @@ class _CartScreenState extends State<CartScreen> {
                             await cartService.loadCart();
                             if (!dlgCtx.mounted) return;
                             Navigator.pop(dlgCtx);
-                            _showSuccessDialog(context, capturedRes, isPaid: true);
+                            PaymentReceiptDialog.show(
+                              context,
+                              capturedRes,
+                              onGoToReservations: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const ReservationsScreen()),
+                                );
+                              },
+                            );
                           } catch (e) {
                             final msg = (e is ApiException) ? e.message : '$e'.replaceAll('Exception: ', '');
                             setDlgState(() {

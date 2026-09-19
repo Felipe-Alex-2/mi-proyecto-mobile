@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/reservation.dart';
 import '../../services/reservation_service.dart';
+import '../../services/notification_service.dart';
+import '../home/widgets/notifications_modal.dart';
+import 'widgets/payment_receipt_sheet.dart';
 
 class ReservationsScreen extends StatefulWidget {
   const ReservationsScreen({super.key});
@@ -72,6 +75,28 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ],
         ),
         actions: [
+          Consumer<NotificationService>(
+            builder: (context, notifService, _) {
+              final unread = notifService.unreadCount;
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: unread > 0,
+                  label: Text(
+                    '$unread',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: Colors.red,
+                  child: const Icon(Icons.notifications_rounded, color: AppTheme.brown, size: 24),
+                ),
+                tooltip: 'Notificaciones ($unread)',
+                onPressed: () => NotificationsModal.show(context, notifService),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
             tooltip: 'Actualizar',
@@ -354,16 +379,21 @@ class _ReservationCard extends StatelessWidget {
             ],
           ),
 
-          // Cancel button if PENDING or CONFIRMED and NOT paid
+          // Receipt button for paid reservations
           if (reservation.isPaid) ...[
             const SizedBox(height: 10),
-            Container(
+            SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              alignment: Alignment.center,
-              child: Text(
-                'Pedido pagado vía PayPal · Presentar código en mostrador de sucursal',
-                style: TextStyle(fontSize: 11, color: Colors.green.shade800, fontWeight: FontWeight.w600),
+              child: ElevatedButton.icon(
+                onPressed: () => PaymentReceiptDialog.show(context, reservation),
+                icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                label: const Text('Ver Recibo de Pago (Factura)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A365D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
               ),
             ),
           ] else if (reservation.isPending || reservation.isConfirmed) ...[
