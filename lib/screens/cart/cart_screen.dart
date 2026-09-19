@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../models/cart.dart';
 import '../../models/reservation.dart';
+import '../../services/api_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/reservation_service.dart';
 import '../reservations/reservations_screen.dart';
@@ -42,6 +44,7 @@ class _CartScreenState extends State<CartScreen> {
     String selectedBranchId = branches.first.id;
     final notesController = TextEditingController();
     bool isSubmitting = false;
+    String? sheetError;
 
     showModalBottomSheet(
       context: context,
@@ -108,7 +111,10 @@ class _CartScreenState extends State<CartScreen> {
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
-                        setSheetState(() => selectedBranchId = val);
+                        setSheetState(() {
+                          selectedBranchId = val;
+                          sheetError = null;
+                        });
                       }
                     },
                   ),
@@ -126,6 +132,35 @@ class _CartScreenState extends State<CartScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
+                  if (sheetError != null) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              sheetError!,
+                              style: TextStyle(
+                                color: Colors.red.shade800,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -133,7 +168,10 @@ class _CartScreenState extends State<CartScreen> {
                       onPressed: isSubmitting
                           ? null
                           : () async {
-                              setSheetState(() => isSubmitting = true);
+                              setSheetState(() {
+                                isSubmitting = true;
+                                sheetError = null;
+                              });
                               try {
                                 final itemsPayload = cart.items
                                     .map((it) => {
@@ -156,14 +194,18 @@ class _CartScreenState extends State<CartScreen> {
 
                                 _showSuccessDialog(context, newRes);
                               } catch (e) {
-                                setSheetState(() => isSubmitting = false);
-                                final errStr = '$e'.replaceAll('Exception: ', '');
-                                final displayMsg = errStr.toLowerCase().contains('stock')
-                                    ? 'Esta sucursal no tiene stock disponible'
-                                    : errStr;
+                                final cleanErr = (e is ApiException)
+                                    ? e.message
+                                    : '$e'
+                                        .replaceAll('Exception: ', '')
+                                        .replaceAll('ApiException: ', '');
+                                setSheetState(() {
+                                  isSubmitting = false;
+                                  sheetError = cleanErr;
+                                });
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(displayMsg),
+                                    content: Text(cleanErr),
                                     backgroundColor: Colors.red.shade700,
                                   ),
                                 );
@@ -346,6 +388,13 @@ class _CartScreenState extends State<CartScreen> {
                           cartService.removeItem(item.id);
                         }
                       },
+                      onQuantityChanged: (newQty) {
+                        if (newQty <= 0) {
+                          cartService.removeItem(item.id);
+                        } else {
+                          cartService.updateQuantity(item.id, newQty);
+                        }
+                      },
                       onRemove: () => cartService.removeItem(item.id),
                     );
                   },
@@ -359,11 +408,12 @@ class _CartScreenState extends State<CartScreen> {
                   color: AppTheme.surface,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
-                      offset: const Offset(0, -3),
+                      offset: const Offset(0, -4),
                     ),
                   ],
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: SafeArea(
                   child: Column(
@@ -371,32 +421,29 @@ class _CartScreenState extends State<CartScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Total (${cart.totalItems} prendas):',
-                            style: const TextStyle(fontSize: 15, color: AppTheme.brownMedium),
+                          const Text(
+                            'Total estimado:',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.brownMedium),
                           ),
                           Text(
                             'Bs ${cart.totalAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.terracotta,
-                            ),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () => _showReservationSheet(context, cart),
-                          icon: const Icon(Icons.storefront_rounded, color: Colors.white),
+                          icon: const Icon(Icons.calendar_today_rounded, size: 18),
                           label: const Text(
-                            'Reservar para Prueba en Tienda',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                            'Reservar para Probar en Tienda',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.terracotta,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -418,14 +465,101 @@ class _CartItemCard extends StatelessWidget {
   final CartItem item;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
+  final ValueChanged<int> onQuantityChanged;
   final VoidCallback onRemove;
 
   const _CartItemCard({
     required this.item,
     required this.onIncrement,
     required this.onDecrement,
+    required this.onQuantityChanged,
     required this.onRemove,
   });
+
+  Future<void> _showQuantityDialog(
+    BuildContext context,
+    CartItem item,
+    ValueChanged<int> onQuantityChanged,
+  ) async {
+    final controller = TextEditingController(text: '${item.quantity}');
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    );
+
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          item.productName ?? 'Modificar cantidad',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.brown),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ingresa la cantidad deseada (solo números):',
+              style: TextStyle(fontSize: 13, color: AppTheme.brownMedium),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              textAlign: TextAlign.center,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(3),
+              ],
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.brown),
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                hintText: '1',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppTheme.terracotta, width: 2),
+                ),
+              ),
+              onSubmitted: (val) {
+                final numVal = int.tryParse(val.trim());
+                if (numVal != null) {
+                  Navigator.pop(ctx, numVal);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: AppTheme.brownMedium)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.terracotta,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final numVal = int.tryParse(controller.text.trim());
+              if (numVal != null) {
+                Navigator.pop(ctx, numVal);
+              }
+            },
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      onQuantityChanged(result);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -495,11 +629,28 @@ class _CartItemCard extends StatelessWidget {
               Row(
                 children: [
                   _QtyButton(icon: Icons.remove, onPressed: onDecrement),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      '${item.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+                  InkWell(
+                    onTap: () => _showQuantityDialog(context, item, onQuantityChanged),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Tooltip(
+                      message: 'Toca para escribir cantidad',
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.creamLight.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.brownMedium.withValues(alpha: 0.25)),
+                        ),
+                        child: Text(
+                          '${item.quantity}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppTheme.brown,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   _QtyButton(icon: Icons.add, onPressed: onIncrement),
