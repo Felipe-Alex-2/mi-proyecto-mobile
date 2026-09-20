@@ -7,6 +7,7 @@ import '../../services/notification_service.dart';
 import '../catalog/catalog_screen.dart';
 import '../cart/cart_screen.dart';
 import '../reservations/reservations_screen.dart';
+import '../virtual_fitting/virtual_fitting_room_screen.dart';
 import 'widgets/notifications_modal.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -271,7 +272,10 @@ class _HomeDashboardTab extends StatelessWidget {
               subtitle: 'Prueba la ropa en ti usando IA',
               label: 'Probar',
               onTap: () {
-                // TODO: Implementar probador virtual
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VirtualFittingRoomScreen()),
+                );
               },
             ),
             const SizedBox(height: 24),

@@ -7,6 +7,9 @@ import '../../services/cart_service.dart';
 import '../../services/reservation_service.dart';
 import '../cart/cart_screen.dart';
 import '../reservations/reservations_screen.dart';
+import '../virtual_fitting/virtual_fitting_room_screen.dart';
+import '../../services/virtual_fitting_service.dart';
+import '../../models/virtual_fitting_result.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -22,6 +25,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? _selectedColor;
   String? _selectedSize;
   bool _isAddingToCart = false;
+  SizeRecommendation? _aiRecommendation;
 
   @override
   void initState() {
@@ -34,6 +38,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (sizes.isNotEmpty) {
       _selectedSize = sizes.first;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchAiRecommendation();
+    });
+  }
+
+  void _fetchAiRecommendation() async {
+    try {
+      final vtonService = context.read<VirtualFittingService>();
+      final rec = await vtonService.getRecommendation(productId: widget.product.id);
+      if (!mounted) return;
+      setState(() {
+        _aiRecommendation = rec;
+        // Asignación automática inteligente:
+        final matchingSize = widget.product.availableSizes.firstWhere(
+          (s) => s.trim().toLowerCase() == rec.recommendedSize.trim().toLowerCase(),
+          orElse: () => '',
+        );
+        if (matchingSize.isNotEmpty) {
+          _selectedSize = matchingSize;
+          for (final v in widget.product.variants) {
+            final colorMatches = _selectedColor == null || v.color.trim().toLowerCase() == _selectedColor!.trim().toLowerCase();
+            if (v.size.trim().toLowerCase() == matchingSize.trim().toLowerCase() && colorMatches) {
+              _selectedVariantId = v.id;
+              break;
+            }
+          }
+        }
+      });
+    } catch (_) {}
   }
 
   List<ProductVariant> get _filteredVariants {
@@ -442,6 +475,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: SafeArea(
         child: Row(
           children: [
+            // Probador Virtual button
+            IconButton(
+              icon: const Icon(Icons.face_retouching_natural_rounded, color: AppTheme.terracotta),
+              tooltip: 'Probarse con IA',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => VirtualFittingRoomScreen(initialProduct: widget.product)),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+
             // Reserve button (CU13)
             Expanded(
               flex: 1,
@@ -682,6 +728,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_aiRecommendation != null) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.terracotta.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome_rounded, color: AppTheme.terracotta, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Recomendación IA: Talla ${_aiRecommendation!.recommendedSize}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.brown, fontSize: 13),
+                      ),
+                      Text(
+                        '${_aiRecommendation!.confidenceScore.toStringAsFixed(0)}% de confianza biométrica',
+                        style: const TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => VirtualFittingRoomScreen(initialProduct: widget.product)),
+                    );
+                  },
+                  child: const Text('Probarse', style: TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ],
         _sectionTitle('Seleccionar Talla', _selectedSize),
         const SizedBox(height: 10),
         Wrap(
