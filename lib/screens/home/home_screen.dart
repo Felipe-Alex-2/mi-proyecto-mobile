@@ -87,6 +87,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppTheme.surface,
+              title: const Text('Asistente Carlitos', style: TextStyle(color: AppTheme.brown)),
+              content: const Text('Hola, soy Carlitos, tu asistente virtual. En el futuro te ayudaré aquí.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cerrar'),
+                ),
+              ],
+            ),
+          );
+        },
+        backgroundColor: AppTheme.terracotta,
+        child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+      ),
     );
   }
 }
@@ -244,33 +264,15 @@ class _HomeDashboardTab extends StatelessWidget {
 
             // Quick access cards
             _QuickAccessCard(
-              icon: Icons.grid_view_rounded,
-              iconColor: AppTheme.terracotta,
-              iconBg: AppTheme.terracotta.withValues(alpha: 0.1),
-              title: 'Catálogo Digital (CU11)',
-              subtitle: 'Prendas, filtros de talla, color y precios en Bs',
-              label: 'Explorar',
-              onTap: () => onNavigateToTab(1),
-            ),
-            const SizedBox(height: 12),
-            _QuickAccessCard(
-              icon: Icons.shopping_bag_outlined,
-              iconColor: Colors.teal,
-              iconBg: Colors.teal.withValues(alpha: 0.1),
-              title: 'Mi Carrito de Compras (CU12)',
-              subtitle: 'Prepara tu selección antes de visitar la tienda',
-              label: 'Ver Carrito',
-              onTap: () => onNavigateToTab(2),
-            ),
-            const SizedBox(height: 12),
-            _QuickAccessCard(
-              icon: Icons.event_note_rounded,
-              iconColor: Colors.deepPurple,
-              iconBg: Colors.deepPurple.withValues(alpha: 0.1),
-              title: 'Mis Reservas de Prueba (CU13)',
-              subtitle: 'Consulta el estado y tiempo de validez de tus prendas',
-              label: 'Ver Reservas',
-              onTap: () => onNavigateToTab(3),
+              icon: Icons.face_retouching_natural_rounded,
+              iconColor: Colors.purple,
+              iconBg: Colors.purple.withValues(alpha: 0.1),
+              title: 'Probador Virtual',
+              subtitle: 'Prueba la ropa en ti usando IA',
+              label: 'Probar',
+              onTap: () {
+                // TODO: Implementar probador virtual
+              },
             ),
             const SizedBox(height: 24),
 
