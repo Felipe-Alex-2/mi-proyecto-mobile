@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
   SizeRecommendation? _recommendation;
   VirtualFittingResult? _tryOnResult;
+
+  /// Bytes de la imagen generada por IDM-VTON (cuando el try-on real fue exitoso).
+  Uint8List? _idmResultBytes;
 
   bool _isLoadingRecommendation = false;
   bool _isAddingToCart = false;
@@ -149,6 +153,91 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     if (_selectedProduct == null) return;
 
     final vtonService = context.read<VirtualFittingService>();
+
+    // Si el usuario subió su foto, intentamos el try-on real con IDM-VTON
+    if (_userImageFile != null) {
+      try {
+        // Leer bytes de la foto del usuario
+        final personBytes = await _userImageFile!.readAsBytes();
+        final personFilename = _userImageFile!.name;
+
+        // Descargar la imagen de la prenda desde la URL del producto
+        final garmentUrl = _selectedProduct!.imageUrl;
+        if (garmentUrl == null || garmentUrl.isEmpty) {
+          throw Exception('El producto no tiene imagen de prenda disponible.');
+        }
+        final garmentResponse = await HttpClient().getUrl(Uri.parse(garmentUrl));
+        final garmentHttpResponse = await garmentResponse.close();
+        final garmentBytes = Uint8List.fromList(
+          await garmentHttpResponse.expand((chunk) => chunk).toList(),
+        );
+        final garmentFilename = garmentUrl.split('/').last.split('?').first;
+
+        // Descripción por defecto con nombre del producto
+        final garmentDesc = _selectedProduct!.name;
+
+        final dataUri = await vtonService.tryOnWithIDMVTON(
+          personImageBytes: personBytes,
+          personFilename: personFilename,
+          garmentImageBytes: garmentBytes,
+          garmentFilename: garmentFilename.isNotEmpty ? garmentFilename : 'garment.jpg',
+          garmentDescription: garmentDesc,
+        );
+
+        if (!mounted) return;
+
+        // Extraer bytes del data URI (data:image/webp;base64,...)
+        Uint8List? resultBytes;
+        if (dataUri.contains(',')) {
+          final b64 = dataUri.split(',').last;
+          resultBytes = base64Decode(b64);
+        }
+
+        setState(() {
+          _idmResultBytes = resultBytes;
+          _showAfter = true;
+        });
+
+        _openFullScreenViewer();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Try-On generado con IDM-VTON exitosamente! ✨'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      } on HttpException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo descargar la imagen de la prenda: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        // Fallback al try-on simulado
+      } catch (e) {
+        if (!mounted) return;
+        final isServiceDown = e.toString().contains('503') ||
+            e.toString().contains('no está disponible') ||
+            e.toString().contains('VTON_URL');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isServiceDown
+                  ? '⚠️ Servicio IDM-VTON no disponible. Usando simulación visual.'
+                  : 'Error en IDM-VTON: $e. Usando simulación visual.',
+            ),
+            backgroundColor: isServiceDown ? Colors.orange : Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        // Fallback al try-on simulado si IDM-VTON falla
+      }
+    }
+
+    // Fallback: try-on simulado (sin foto real o si IDM-VTON falló)
     try {
       final result = await vtonService.tryOnGarment(
         productId: _selectedProduct!.id,
@@ -160,6 +249,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       if (!mounted) return;
       setState(() {
         _tryOnResult = result;
+        _idmResultBytes = null; // Limpiar resultado IDM anterior
         _showAfter = true;
       });
 
@@ -297,6 +387,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           product: _selectedProduct,
           userImageFile: _userImageFile,
           tryOnResult: _tryOnResult,
+          idmResultBytes: _idmResultBytes,
           initialShowAfter: _showAfter,
           selectedSize: _selectedSize,
           onAddToCart: _addToCart,
@@ -306,7 +397,8 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   }
 
   Widget _buildTryOnViewer(bool isProcessing) {
-    final hasResult = _tryOnResult != null;
+    final hasIdmResult = _idmResultBytes != null && _idmResultBytes!.isNotEmpty;
+    final hasResult = hasIdmResult || _tryOnResult != null;
     final garmentImg = _selectedProduct?.imageUrl;
 
     return GestureDetector(
@@ -332,18 +424,25 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
             children: [
             // Imagen de Fondo / Prenda / Resultado
             Positioned.fill(
-              child: _userImageFile != null && (!_showAfter || !hasResult)
-                  ? Image.file(
-                      File(_userImageFile!.path),
+              child: _showAfter && hasIdmResult
+                  // Prioridad 1: imagen real de IDM-VTON como bytes
+                  ? Image.memory(
+                      _idmResultBytes!,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => _buildPlaceholderGraphic(garmentImg),
                     )
-                  : (hasResult && _showAfter
-                      ? Image.network(
-                          _tryOnResult!.resultImageUrl,
+                  : (_userImageFile != null && (!_showAfter || !hasResult)
+                      ? Image.file(
+                          File(_userImageFile!.path),
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => _buildPlaceholderGraphic(garmentImg),
                         )
-                      : _buildPlaceholderGraphic(garmentImg)),
+                      : (_tryOnResult != null && _showAfter
+                          ? Image.network(
+                              _tryOnResult!.resultImageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => _buildPlaceholderGraphic(garmentImg),
+                            )
+                          : _buildPlaceholderGraphic(garmentImg))),
             ),
 
             // Overlay degradado para legibilidad
@@ -845,6 +944,8 @@ class FullScreenVtonViewer extends StatefulWidget {
   final Product? product;
   final XFile? userImageFile;
   final VirtualFittingResult? tryOnResult;
+  /// Bytes de la imagen generada por IDM-VTON (prioridad sobre tryOnResult URL).
+  final Uint8List? idmResultBytes;
   final bool initialShowAfter;
   final String? selectedSize;
   final VoidCallback onAddToCart;
@@ -854,6 +955,7 @@ class FullScreenVtonViewer extends StatefulWidget {
     required this.product,
     required this.userImageFile,
     required this.tryOnResult,
+    this.idmResultBytes,
     required this.initialShowAfter,
     required this.selectedSize,
     required this.onAddToCart,
@@ -874,7 +976,8 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final hasResult = widget.tryOnResult != null;
+    final hasIdmResult = widget.idmResultBytes != null && widget.idmResultBytes!.isNotEmpty;
+    final hasResult = hasIdmResult || widget.tryOnResult != null;
     final hasUserPhoto = widget.userImageFile != null;
     final garmentImg = widget.product?.imageUrl;
 
@@ -941,7 +1044,7 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
             child: InteractiveViewer(
               minScale: 0.8,
               maxScale: 4.0,
-              child: _buildMainImage(garmentImg, hasResult),
+              child: _buildMainImage(garmentImg, hasResult, hasIdmResult),
             ),
           ),
 
@@ -998,7 +1101,16 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
     );
   }
 
-  Widget _buildMainImage(String? garmentImg, bool hasResult) {
+  Widget _buildMainImage(String? garmentImg, bool hasResult, bool hasIdmResult) {
+    // Prioridad 1: imagen real de IDM-VTON como bytes
+    if (_showAfter && hasIdmResult) {
+      return Image.memory(
+        widget.idmResultBytes!,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => _fallbackGraphic(garmentImg),
+      );
+    }
+
     if (widget.userImageFile != null && (!_showAfter || !hasResult)) {
       return Image.file(
         File(widget.userImageFile!.path),
@@ -1006,7 +1118,7 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
       );
     }
 
-    if (hasResult && _showAfter) {
+    if (widget.tryOnResult != null && _showAfter) {
       return Image.network(
         widget.tryOnResult!.resultImageUrl,
         fit: BoxFit.contain,

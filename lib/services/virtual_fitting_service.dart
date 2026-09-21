@@ -114,4 +114,61 @@ class VirtualFittingService extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Realiza el Virtual Try-On real usando IDM-VTON via Gradio.
+  ///
+  /// Envía las imágenes como multipart al endpoint /virtual-fitting/idm-tryon
+  /// y retorna los bytes de la imagen resultado (PNG/WebP) en base64.
+  ///
+  /// Lanza [ApiException] con statusCode 503 si el servicio VTON no está activo.
+  Future<String> tryOnWithIDMVTON({
+    required List<int> personImageBytes,
+    required String personFilename,
+    required List<int> garmentImageBytes,
+    required String garmentFilename,
+    String garmentDescription = '',
+    bool useAutoMask = true,
+    bool useAutoCrop = false,
+    int denoiseSteps = 30,
+    int seed = 42,
+  }) async {
+    _isTryingOn = true;
+    notifyListeners();
+
+    try {
+      final data = await _apiService.postMultipart(
+        '/virtual-fitting/idm-tryon',
+        fileFields: {
+          'person_image': {
+            'bytes': personImageBytes,
+            'filename': personFilename,
+            'contentType': 'image/jpeg',
+          },
+          'garment_image': {
+            'bytes': garmentImageBytes,
+            'filename': garmentFilename,
+            'contentType': 'image/jpeg',
+          },
+        },
+        formFields: {
+          'garment_description': garmentDescription,
+          'use_auto_mask': useAutoMask.toString(),
+          'use_auto_crop': useAutoCrop.toString(),
+          'denoise_steps': denoiseSteps.toString(),
+          'seed': seed.toString(),
+        },
+      );
+
+      // El backend retorna { result_image_b64, mime_type, message }
+      final b64 = data['result_image_b64'] as String? ?? '';
+      final mimeType = data['mime_type'] as String? ?? 'image/webp';
+      return 'data:$mimeType;base64,$b64';
+    } catch (e) {
+      debugPrint('Error en IDM-VTON try-on: $e');
+      rethrow;
+    } finally {
+      _isTryingOn = false;
+      notifyListeners();
+    }
+  }
 }

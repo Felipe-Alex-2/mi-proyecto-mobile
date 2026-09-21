@@ -1,5 +1,6 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/api_config.dart';
 import 'storage_service.dart';
 
@@ -129,6 +130,63 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException('Error de conexión con el servidor ($e)');
     }
+  }
+
+  /// Envía un request multipart/form-data (para subir archivos al backend).
+  ///
+  /// [endpoint] - path del endpoint (ej. '/virtual-fitting/idm-tryon')
+  /// [fileFields] - mapa de nombre_campo -> {bytes, filename, contentType}
+  /// [formFields] - mapa de nombre_campo -> valor string
+  Future<dynamic> postMultipart(
+    String endpoint, {
+    required Map<String, Map<String, dynamic>> fileFields,
+    Map<String, String>? formFields,
+    bool includeAuth = true,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+    final request = http.MultipartRequest('POST', url);
+
+    if (includeAuth) {
+      final token = await _storageService.getAccessToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+    }
+
+    // Agregar campos de archivo
+    for (final entry in fileFields.entries) {
+      final fieldName = entry.key;
+      final fileData = entry.value;
+      final bytes = fileData['bytes'] as List<int>;
+      final filename = fileData['filename'] as String;
+      final contentType = fileData['contentType'] as String? ?? 'image/jpeg';
+
+      request.files.add(http.MultipartFile.fromBytes(
+        fieldName,
+        bytes,
+        filename: filename,
+        contentType: _mediaType(contentType),
+      ));
+    }
+
+    // Agregar campos de formulario
+    if (formFields != null) {
+      request.fields.addAll(formFields);
+    }
+
+    try {
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+      return _processResponse(response);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Error de conexión con el servidor ($e)');
+    }
+  }
+
+  MediaType _mediaType(String contentType) {
+    final parts = contentType.split('/');
+    return MediaType(parts[0], parts.length > 1 ? parts[1] : 'octet-stream');
   }
 
   dynamic _processResponse(http.Response response) {
