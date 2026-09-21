@@ -11,6 +11,7 @@ import 'services/reservation_service.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'services/virtual_fitting_service.dart';
+import 'services/recommendation_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,7 @@ void main() {
   final reservationService = ReservationService(apiService);
   final notificationService = NotificationService(apiService);
   final virtualFittingService = VirtualFittingService(apiService);
+  final recommendationService = RecommendationService(apiService);
 
   runApp(
     MultiProvider(
@@ -35,6 +37,7 @@ void main() {
         ChangeNotifierProvider<ReservationService>.value(value: reservationService),
         ChangeNotifierProvider<NotificationService>.value(value: notificationService),
         ChangeNotifierProvider<VirtualFittingService>.value(value: virtualFittingService),
+        ChangeNotifierProvider<RecommendationService>.value(value: recommendationService),
       ],
       child: const MyApp(),
     ),

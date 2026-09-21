@@ -161,17 +161,40 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
         final personBytes = await _userImageFile!.readAsBytes();
         final personFilename = _userImageFile!.name;
 
-        // Descargar la imagen de la prenda desde la URL del producto
+        // Obtener los bytes de la imagen de la prenda.
+        // Las imágenes del catálogo pueden ser data URIs (base64) o URLs HTTP.
         final garmentUrl = _selectedProduct!.imageUrl;
         if (garmentUrl == null || garmentUrl.isEmpty) {
           throw Exception('El producto no tiene imagen de prenda disponible.');
         }
-        final garmentResponse = await HttpClient().getUrl(Uri.parse(garmentUrl));
-        final garmentHttpResponse = await garmentResponse.close();
-        final garmentBytes = Uint8List.fromList(
-          await garmentHttpResponse.expand((chunk) => chunk).toList(),
-        );
-        final garmentFilename = garmentUrl.split('/').last.split('?').first;
+
+        Uint8List garmentBytes;
+        String garmentFilename;
+
+        if (garmentUrl.startsWith('data:')) {
+          // Caso 1: La imagen ya está en base64 (data:image/jpeg;base64,...)
+          if (!garmentUrl.contains(',')) {
+            throw Exception('Formato de imagen de prenda no válido.');
+          }
+          final b64Part = garmentUrl.split(',').last;
+          garmentBytes = base64Decode(b64Part);
+
+          // Detectar extensión desde el mime type (data:image/jpeg -> .jpg)
+          final mimeMatch = RegExp(r'data:image/(\w+);').firstMatch(garmentUrl);
+          final ext = mimeMatch?.group(1) ?? 'jpg';
+          garmentFilename = 'garment.$ext';
+        } else if (garmentUrl.startsWith('http://') || garmentUrl.startsWith('https://')) {
+          // Caso 2: URL HTTP normal, descargar la imagen
+          final garmentResponse = await HttpClient().getUrl(Uri.parse(garmentUrl));
+          final garmentHttpResponse = await garmentResponse.close();
+          garmentBytes = Uint8List.fromList(
+            await garmentHttpResponse.expand((chunk) => chunk).toList(),
+          );
+          garmentFilename = garmentUrl.split('/').last.split('?').first;
+          if (garmentFilename.isEmpty) garmentFilename = 'garment.jpg';
+        } else {
+          throw Exception('Formato de URL de prenda no soportado: $garmentUrl');
+        }
 
         // Descripción por defecto con nombre del producto
         final garmentDesc = _selectedProduct!.name;

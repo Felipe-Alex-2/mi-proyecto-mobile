@@ -8,6 +8,7 @@ import '../catalog/catalog_screen.dart';
 import '../cart/cart_screen.dart';
 import '../reservations/reservations_screen.dart';
 import '../virtual_fitting/virtual_fitting_room_screen.dart';
+import '../assistant/assistant_carlitos_screen.dart';
 import 'widgets/notifications_modal.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -88,25 +89,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              backgroundColor: AppTheme.surface,
-              title: const Text('Asistente Carlitos', style: TextStyle(color: AppTheme.brown)),
-              content: const Text('Hola, soy Carlitos, tu asistente virtual. En el futuro te ayudaré aquí.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cerrar'),
-                ),
-              ],
-            ),
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AssistantCarlitosScreen()),
           );
         },
         backgroundColor: AppTheme.terracotta,
-        child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+        label: const Text(
+          'Carlitos IA',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
       ),
     );
   }
@@ -264,6 +263,22 @@ class _HomeDashboardTab extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Quick access cards
+            _QuickAccessCard(
+              icon: Icons.auto_awesome,
+              iconColor: AppTheme.terracotta,
+              iconBg: AppTheme.terracotta.withValues(alpha: 0.1),
+              title: 'Asistente y Recomendador IA',
+              subtitle: 'Carlitos te recomienda prendas según tus gustos',
+              label: 'Consultar',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AssistantCarlitosScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+
             _QuickAccessCard(
               icon: Icons.face_retouching_natural_rounded,
               iconColor: Colors.purple,
