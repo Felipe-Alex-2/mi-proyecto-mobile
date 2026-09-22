@@ -145,28 +145,6 @@ class _AssistantCarlitosScreenState extends State<AssistantCarlitosScreen> {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.bolt, color: Colors.amber, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'Gemini AI',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -742,7 +720,7 @@ class _AssistantCarlitosScreenState extends State<AssistantCarlitosScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Bs ${product.minPrice.toStringAsFixed(2)}',
+                        '\$ ${product.minPrice.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,

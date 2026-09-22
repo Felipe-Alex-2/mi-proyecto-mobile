@@ -11,7 +11,15 @@ import '../../services/cart_service.dart';
 import '../../services/catalog_service.dart';
 import '../../services/virtual_fitting_service.dart';
 import '../cart/cart_screen.dart';
-import 'biometric_onboarding_screen.dart';
+import '../../models/biometric_profile.dart';
+import 'garment_transparent_processor.dart';
+
+enum FittingViewerMode {
+  overlay, // 👗 Prenda sobre ti (vestidor virtual superpuesto interactivo)
+  aiResult, // ✨ Look IA (IDM-VTON generativo o simulación)
+  userPhoto, // 👤 Mi foto
+  garment, // 👕 Prenda catálogo
+}
 
 class VirtualFittingRoomScreen extends StatefulWidget {
   final Product? initialProduct;
@@ -40,7 +48,18 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
   bool _isLoadingRecommendation = false;
   bool _isAddingToCart = false;
-  bool _showAfter = true; // Selector Antes / Después
+
+  /// Modo de visualización del probador virtual
+  FittingViewerMode _viewerMode = FittingViewerMode.overlay;
+
+  /// Posición interactiva de la prenda sobre la persona
+  Offset _garmentOffset = Offset.zero;
+
+  /// Factor de escala interactivo de la prenda
+  double _garmentScale = 1.0;
+
+  /// Nivel de opacidad de la prenda superpuesta (por defecto 96% para visualización realista)
+  final double _garmentOpacity = 0.96;
 
   @override
   void initState() {
@@ -54,19 +73,6 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     final vtonService = context.read<VirtualFittingService>();
     final catalogService = context.read<CatalogService>();
 
-    // Verificar si el usuario tiene perfil biométrico
-    final profile = vtonService.profile ?? await vtonService.loadProfile();
-    if (profile == null && mounted) {
-      // Redirigir a onboarding biométrico si aún no tiene perfil
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const BiometricOnboardingScreen(redirectToFittingRoom: true),
-        ),
-      );
-      return;
-    }
-
     // Cargar catálogo si no está cargado
     if (catalogService.products.isEmpty) {
       await catalogService.loadProducts();
@@ -79,6 +85,14 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
         _selectProduct(prod);
       }
     }
+
+    // Obtener perfil biométrico existente (o null)
+    final profile = vtonService.profile ?? await vtonService.loadProfile();
+
+    // Preguntar siempre al ingresar sobre sus medidas para calcular su talla ideal
+    if (mounted) {
+      _promptBiometricMeasurements(profile);
+    }
   }
 
   void _selectProduct(Product product) async {
@@ -86,6 +100,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       _selectedProduct = product;
       _selectedColor = product.availableColors.isNotEmpty ? product.availableColors.first : null;
       _tryOnResult = null;
+      _idmResultBytes = null;
+      _garmentOffset = Offset.zero;
+      _garmentScale = 1.0;
+      _viewerMode = FittingViewerMode.overlay;
       _isLoadingRecommendation = true;
     });
 
@@ -218,7 +236,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
         setState(() {
           _idmResultBytes = resultBytes;
-          _showAfter = true;
+          _viewerMode = FittingViewerMode.aiResult;
         });
 
         _openFullScreenViewer();
@@ -249,7 +267,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           SnackBar(
             content: Text(
               isServiceDown
-                  ? '⚠️ Servicio IDM-VTON no disponible. Usando simulación visual.'
+                  ? 'Servicio IDM-VTON no disponible. Usando simulación visual.'
                   : 'Error en IDM-VTON: $e. Usando simulación visual.',
             ),
             backgroundColor: isServiceDown ? Colors.orange : Colors.red,
@@ -273,7 +291,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       setState(() {
         _tryOnResult = result;
         _idmResultBytes = null; // Limpiar resultado IDM anterior
-        _showAfter = true;
+        _viewerMode = FittingViewerMode.aiResult;
       });
 
       // Abrir en pantalla completa automáticamente al generarse
@@ -355,15 +373,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.straighten_rounded, color: AppTheme.terracotta),
-            tooltip: 'Ajustar mis medidas',
-            onPressed: () async {
-              final updated = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (_) => const BiometricOnboardingScreen(redirectToFittingRoom: false)),
-              );
-              if (updated == true && _selectedProduct != null) {
-                _selectProduct(_selectedProduct!);
-              }
+            tooltip: 'Ajustar mis medidas biométricas',
+            onPressed: () {
+              _promptBiometricMeasurements(profile);
             },
           ),
         ],
@@ -411,84 +423,586 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           userImageFile: _userImageFile,
           tryOnResult: _tryOnResult,
           idmResultBytes: _idmResultBytes,
-          initialShowAfter: _showAfter,
+          initialViewerMode: _viewerMode,
           selectedSize: _selectedSize,
+          initialOffset: _garmentOffset,
+          initialScale: _garmentScale,
           onAddToCart: _addToCart,
+          onPickImage: _pickImage,
         ),
       ),
     );
   }
 
-  Widget _buildTryOnViewer(bool isProcessing) {
-    final hasIdmResult = _idmResultBytes != null && _idmResultBytes!.isNotEmpty;
-    final hasResult = hasIdmResult || _tryOnResult != null;
-    final garmentImg = _selectedProduct?.imageUrl;
+  /// Calcula la posición anatómica inicial por categoría de catálogo
+  Map<String, dynamic> _getGarmentPositioning(Product? product) {
+    if (product == null) {
+      return {'alignment': const Alignment(0.0, -0.18), 'heightFraction': 0.46};
+    }
+    final text = '${product.category} ${product.name}'.toLowerCase();
+    if (text.contains('pantal') ||
+        text.contains('jean') ||
+        text.contains('short') ||
+        text.contains('falda') ||
+        text.contains('bermuda') ||
+        text.contains('pants')) {
+      // Prenda inferior: piernas / cintura hacia abajo
+      return {'alignment': const Alignment(0.0, 0.48), 'heightFraction': 0.50};
+    }
+    if (text.contains('vestid') ||
+        text.contains('enteriz') ||
+        text.contains('overol') ||
+        text.contains('traje')) {
+      // Prenda completa: desde hombros hasta rodillas
+      return {'alignment': const Alignment(0.0, 0.08), 'heightFraction': 0.72};
+    }
+    if (text.contains('zapato') ||
+        text.contains('zapatilla') ||
+        text.contains('bota') ||
+        text.contains('sandalia')) {
+      // Calzado: pies
+      return {'alignment': const Alignment(0.0, 0.88), 'heightFraction': 0.22};
+    }
+    // Prenda superior (polera, camisa, blusa, casaca, top, hoodie, chompa)
+    return {'alignment': const Alignment(0.0, -0.22), 'heightFraction': 0.46};
+  }
 
-    return GestureDetector(
-      onTap: isProcessing ? null : _openFullScreenViewer,
-      child: Container(
-        height: 380,
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.15)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 15,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-            // Imagen de Fondo / Prenda / Resultado
-            Positioned.fill(
-              child: _showAfter && hasIdmResult
-                  // Prioridad 1: imagen real de IDM-VTON como bytes
-                  ? Image.memory(
-                      _idmResultBytes!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => _buildPlaceholderGraphic(garmentImg),
-                    )
-                  : (_userImageFile != null && (!_showAfter || !hasResult)
-                      ? Image.file(
-                          File(_userImageFile!.path),
-                          fit: BoxFit.cover,
-                        )
-                      : (_tryOnResult != null && _showAfter
-                          ? Image.network(
-                              _tryOnResult!.resultImageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => _buildPlaceholderGraphic(garmentImg),
-                            )
-                          : _buildPlaceholderGraphic(garmentImg))),
-            ),
+  /// Helper para cargar imagen de prenda garantizando formato PNG sin fondo
+  Widget _buildGarmentImage(String? imageUrl, {BoxFit fit = BoxFit.contain, bool removeWhiteBg = true}) {
+    return TransparentGarmentWidget(
+      imageUrl: imageUrl,
+      fit: fit,
+      removeWhiteBg: removeWhiteBg,
+    );
+  }
 
-            // Overlay degradado para legibilidad
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.3),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.5),
+  Widget _buildMeasurementInput({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    required String hint,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 11, color: AppTheme.brownMedium),
+        hintText: hint,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        prefixIcon: Icon(icon, size: 16, color: AppTheme.terracotta),
+      ),
+      validator: (val) {
+        if (val == null || val.trim().isEmpty) return 'Requerido';
+        final n = double.tryParse(val.trim());
+        if (n == null || n <= 0) return 'Inválido';
+        return null;
+      },
+    );
+  }
+
+  Future<void> _promptBiometricMeasurements(BiometricProfile? existingProfile) async {
+    final vtonService = context.read<VirtualFittingService>();
+    String selectedGender = (existingProfile?.gender.toUpperCase() == 'MUJER') ? 'MUJER' : 'HOMBRE';
+    final heightCtrl = TextEditingController(text: (existingProfile?.heightCm ?? 172.0).toStringAsFixed(0));
+    final weightCtrl = TextEditingController(text: (existingProfile?.weightKg ?? 70.0).toStringAsFixed(0));
+    final chestCtrl = TextEditingController(text: (existingProfile?.chestCm ?? 95.0).toStringAsFixed(0));
+    final waistCtrl = TextEditingController(text: (existingProfile?.waistCm ?? 82.0).toStringAsFixed(0));
+    final hipCtrl = TextEditingController(text: (existingProfile?.hipCm ?? 98.0).toStringAsFixed(0));
+    final formKey = GlobalKey<FormState>();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.terracotta.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.straighten_rounded, color: AppTheme.terracotta, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '📏 Tu Talla Ideal con IA',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.brown,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Confirma tus medidas para calcular tu talla perfecta:',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Gender selector
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Center(child: Text('Hombre 👔')),
+                              selected: selectedGender == 'HOMBRE',
+                              selectedColor: AppTheme.terracotta.withValues(alpha: 0.2),
+                              labelStyle: TextStyle(
+                                color: selectedGender == 'HOMBRE' ? AppTheme.terracotta : AppTheme.brown,
+                                fontWeight: selectedGender == 'HOMBRE' ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              onSelected: (val) {
+                                if (val) setModalState(() => selectedGender = 'HOMBRE');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Center(child: Text('Mujer 👗')),
+                              selected: selectedGender == 'MUJER',
+                              selectedColor: AppTheme.terracotta.withValues(alpha: 0.2),
+                              labelStyle: TextStyle(
+                                color: selectedGender == 'MUJER' ? AppTheme.terracotta : AppTheme.brown,
+                                fontWeight: selectedGender == 'MUJER' ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              onSelected: (val) {
+                                if (val) setModalState(() => selectedGender = 'MUJER');
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Altura y Peso
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMeasurementInput(
+                              label: 'Altura (cm)',
+                              controller: heightCtrl,
+                              icon: Icons.height_rounded,
+                              hint: '172',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildMeasurementInput(
+                              label: 'Peso (kg)',
+                              controller: weightCtrl,
+                              icon: Icons.fitness_center_rounded,
+                              hint: '70',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Pecho, Cintura, Cadera
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMeasurementInput(
+                              label: 'Pecho (cm)',
+                              controller: chestCtrl,
+                              icon: Icons.accessibility_new_rounded,
+                              hint: '95',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMeasurementInput(
+                              label: 'Cintura (cm)',
+                              controller: waistCtrl,
+                              icon: Icons.donut_small_rounded,
+                              hint: '82',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMeasurementInput(
+                              label: 'Cadera (cm)',
+                              controller: hipCtrl,
+                              icon: Icons.airline_seat_legroom_reduced_rounded,
+                              hint: '98',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Botón principal
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Calcular Talla y Probar Prendas',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.terracotta,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          if (!formKey.currentState!.validate()) return;
+                          Navigator.pop(sheetContext);
+
+                          final messenger = ScaffoldMessenger.of(this.context);
+                          final newProfile = BiometricProfile(
+                            gender: selectedGender,
+                            heightCm: double.tryParse(heightCtrl.text.trim()) ?? 172.0,
+                            weightKg: double.tryParse(weightCtrl.text.trim()) ?? 70.0,
+                            chestCm: double.tryParse(chestCtrl.text.trim()) ?? 95.0,
+                            waistCm: double.tryParse(waistCtrl.text.trim()) ?? 82.0,
+                            hipCm: double.tryParse(hipCtrl.text.trim()) ?? 98.0,
+                          );
+
+                          await vtonService.saveProfile(newProfile);
+
+                          if (!mounted) return;
+
+                          if (_selectedProduct != null) {
+                            _selectProduct(_selectedProduct!);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('📏 Talla calculada para ${selectedGender.toLowerCase()}: ${_selectedSize ?? "M"}'),
+                                backgroundColor: AppTheme.terracotta,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+
+                      if (existingProfile != null) ...[
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          child: Text(
+                            'Continuar con medidas guardadas (${existingProfile.heightCm.toInt()}cm, ${existingProfile.weightKg.toInt()}kg)',
+                            style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Silueta y maniquí estilizado cuando el usuario aún no cargó su foto
+  Widget _buildHumanSilhouette(VirtualFittingService vtonService) {
+    final profile = vtonService.profile;
+    return Container(
+      color: const Color(0xFF1E1B18),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 0.95,
+                colors: [Color(0xFF352B24), Color(0xFF13100E)],
+              ),
+            ),
+          ),
+          Opacity(
+            opacity: 0.22,
+            child: Icon(
+              Icons.accessibility_new_rounded,
+              size: 270,
+              color: AppTheme.terracotta.withValues(alpha: 0.8),
+            ),
+          ),
+          Positioned(
+            bottom: 60,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.35)),
+                  ),
+                  child: Text(
+                    profile != null
+                        ? 'Modelo Biométrico: Altura ${profile.heightCm} cm • Pecho ${profile.chestCm} cm'
+                        : 'Silueta del Vestidor Virtual',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _pickImage(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                  label: const Text('Subir mi foto para calzar prendas', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.terracotta.withValues(alpha: 0.9),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Capa interactiva antepuesta de la prenda PNG con arrastre táctil y escala
+  Widget _buildDraggableGarmentOverlay({required double containerHeight}) {
+    final pos = _getGarmentPositioning(_selectedProduct);
+    final Alignment defaultAlignment = pos['alignment'] as Alignment;
+    final double heightFraction = pos['heightFraction'] as double;
+    final double baseHeight = containerHeight * heightFraction;
+
+    return Center(
+      child: Transform.translate(
+        offset: _garmentOffset,
+        child: Transform.scale(
+          scale: _garmentScale,
+          child: Align(
+            alignment: defaultAlignment,
+            child: GestureDetector(
+              onPanUpdate: (details) {
+                setState(() {
+                  _garmentOffset += details.delta;
+                });
+              },
+              child: Opacity(
+                opacity: _garmentOpacity,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: baseHeight,
+                    maxWidth: 290,
+                  ),
+                  child: _buildGarmentImage(_selectedProduct?.imageUrl, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Botón tipo pill para seleccionar el modo de visualización
+  Widget _buildModePill({
+    required String label,
+    required FittingViewerMode mode,
+  }) {
+    final isSelected = _viewerMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _viewerMode = mode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.terracotta : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Botón de acción para tomar o subir foto de la persona
+  Widget _buildPhotoActionButton() {
+    return PopupMenuButton<ImageSource>(
+      tooltip: 'Subir mi foto',
+      onSelected: _pickImage,
+      color: AppTheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (ctx) => [
+        const PopupMenuItem(
+          value: ImageSource.camera,
+          child: Row(
+            children: [
+              Icon(Icons.camera_alt_outlined, color: AppTheme.terracotta, size: 18),
+              SizedBox(width: 8),
+              Text('Tomar Foto'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: ImageSource.gallery,
+          child: Row(
+            children: [
+              Icon(Icons.photo_library_outlined, color: AppTheme.terracotta, size: 18),
+              SizedBox(width: 8),
+              Text('Elegir de Galería'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add_a_photo_rounded, size: 14, color: AppTheme.terracotta),
+            const SizedBox(width: 5),
+            Text(
+              _userImageFile != null ? 'Cambiar Foto' : 'Subir Foto',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.brown),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Contenido de fondo según el modo activo
+  Widget _buildViewerContent(bool hasAiResult, bool hasIdmResult) {
+    final vtonService = context.read<VirtualFittingService>();
+    final garmentImg = _selectedProduct?.imageUrl;
+
+    switch (_viewerMode) {
+      case FittingViewerMode.overlay:
+        // Vestidor Virtual: la persona de fondo (o avatar)
+        if (_userImageFile != null) {
+          return Image.file(
+            File(_userImageFile!.path),
+            fit: BoxFit.cover,
+          );
+        }
+        return _buildHumanSilhouette(vtonService);
+
+      case FittingViewerMode.aiResult:
+        if (hasIdmResult) {
+          return Image.memory(
+            _idmResultBytes!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+          );
+        }
+        if (_tryOnResult != null) {
+          return Image.network(
+            _tryOnResult!.resultImageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+          );
+        }
+        return _buildGarmentImage(garmentImg);
+
+      case FittingViewerMode.userPhoto:
+        if (_userImageFile != null) {
+          return Image.file(
+            File(_userImageFile!.path),
+            fit: BoxFit.cover,
+          );
+        }
+        return _buildHumanSilhouette(vtonService);
+
+      case FittingViewerMode.garment:
+        return Container(
+          color: const Color(0xFF1E1B18),
+          padding: const EdgeInsets.all(24),
+          child: _buildGarmentImage(garmentImg, fit: BoxFit.contain),
+        );
+    }
+  }
+
+  Widget _buildTryOnViewer(bool isProcessing) {
+    final hasIdmResult = _idmResultBytes != null && _idmResultBytes!.isNotEmpty;
+    final hasAiResult = hasIdmResult || _tryOnResult != null;
+    final hasUserPhoto = _userImageFile != null;
+
+    return Container(
+      height: 420,
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 1. Capa de Contenido / Fondo según el modo
+            Positioned.fill(
+              child: _buildViewerContent(hasAiResult, hasIdmResult),
             ),
 
-            // Indicador de Estado / Procesando IA
+            // 2. Capa Prenda PNG Superpuesta e interactiva sobre la persona
+            if (_viewerMode == FittingViewerMode.overlay && _selectedProduct != null)
+              Positioned.fill(
+                child: _buildDraggableGarmentOverlay(containerHeight: 420),
+              ),
+
+            // 3. Indicador de Procesamiento IA
             if (isProcessing)
               Container(
-                color: Colors.black.withValues(alpha: 0.65),
+                color: Colors.black.withValues(alpha: 0.7),
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -507,170 +1021,191 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                 ),
               ),
 
-            // Selector Antes / Después (si hay resultado)
-            if (hasResult && !isProcessing)
+            // 4. Selector de Modos de Visualización (Pills en la parte superior izquierda)
+            if (!isProcessing)
               Positioned(
-                top: 14,
-                left: 14,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildToggleButton(
-                        label: 'Prenda',
-                        isSelected: !_showAfter,
-                        onTap: () => setState(() => _showAfter = false),
-                      ),
-                      _buildToggleButton(
-                        label: 'Look IA ✨',
-                        isSelected: _showAfter,
-                        onTap: () => setState(() => _showAfter = true),
-                      ),
-                    ],
+                top: 12,
+                left: 12,
+                right: 120,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildModePill(
+                          label: '👗 Prenda sobre ti',
+                          mode: FittingViewerMode.overlay,
+                        ),
+                        if (hasAiResult)
+                          _buildModePill(
+                            label: '✨ Look IA',
+                            mode: FittingViewerMode.aiResult,
+                          ),
+                        if (hasUserPhoto)
+                          _buildModePill(
+                            label: '👤 Mi Foto',
+                            mode: FittingViewerMode.userPhoto,
+                          ),
+                        _buildModePill(
+                          label: '👕 Prenda',
+                          mode: FittingViewerMode.garment,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
 
-            // Botón flotante para cambiar foto del usuario
+            // 5. Botón flotante para cambiar foto del usuario (superior derecha)
             Positioned(
-              top: 14,
-              right: 14,
-              child: PopupMenuButton<ImageSource>(
-                tooltip: 'Subir mi foto',
-                onSelected: _pickImage,
-                color: AppTheme.surface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(
-                    value: ImageSource.camera,
-                    child: Row(
-                      children: [
-                        Icon(Icons.camera_alt_outlined, color: AppTheme.terracotta, size: 20),
-                        SizedBox(width: 8),
-                        Text('Tomar Foto'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: ImageSource.gallery,
-                    child: Row(
-                      children: [
-                        Icon(Icons.photo_library_outlined, color: AppTheme.terracotta, size: 20),
-                        SizedBox(width: 8),
-                        Text('Elegir de Galería'),
-                      ],
-                    ),
-                  ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.add_a_photo_rounded, size: 16, color: AppTheme.terracotta),
-                      const SizedBox(width: 6),
-                      Text(
-                        _userImageFile != null ? 'Cambiar Foto' : 'Subir Foto',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.brown),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              top: 12,
+              right: 12,
+              child: _buildPhotoActionButton(),
             ),
 
-            // Información inferior sobre la prenda activa
+            // 6. Controles interactivos de ajuste de la prenda antepuesta (Zoom +, Zoom -, Centrar)
+            if (_viewerMode == FittingViewerMode.overlay && !isProcessing && _selectedProduct != null)
+              Positioned(
+                right: 12,
+                bottom: 74,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Agrandar prenda',
+                        onPressed: () {
+                          setState(() {
+                            if (_garmentScale < 2.2) _garmentScale += 0.08;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Reducir prenda',
+                        onPressed: () {
+                          setState(() {
+                            if (_garmentScale > 0.5) _garmentScale -= 0.08;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Centrar prenda',
+                        onPressed: () {
+                          setState(() {
+                            _garmentOffset = Offset.zero;
+                            _garmentScale = 1.0;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 7. Hint de arrastre táctil (cuando está en modo overlay)
+            if (_viewerMode == FittingViewerMode.overlay && !isProcessing)
+              Positioned(
+                bottom: 76,
+                left: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.touch_app_rounded, color: Colors.white70, size: 14),
+                      SizedBox(width: 5),
+                      Text(
+                        'Arrastra para calzar la prenda',
+                        style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 8. Información inferior sobre la prenda activa y botones de acción
             if (!isProcessing && _selectedProduct != null)
               Positioned(
-                bottom: 14,
-                left: 16,
-                right: 16,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedProduct!.name,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Bs ${_selectedProduct!.basePrice.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.88),
+                        Colors.black.withValues(alpha: 0.45),
+                        Colors.transparent,
+                      ],
                     ),
-                    ElevatedButton.icon(
-                      onPressed: isProcessing ? null : _runVirtualTryOn,
-                      icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Colors.white),
-                      label: const Text('Probar con IA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.terracotta,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _selectedProduct!.name,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '\$ ${_selectedProduct!.basePrice.toStringAsFixed(2)} • ${_selectedProduct!.category}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 24),
+                        tooltip: 'Pantalla completa',
+                        onPressed: _openFullScreenViewer,
+                      ),
+                      const SizedBox(width: 4),
+                      ElevatedButton.icon(
+                        onPressed: isProcessing ? null : _runVirtualTryOn,
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
+                        label: const Text('Look IA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.terracotta,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
-        ),
-      ),
-    ),
-  );
-}
-
-  Widget _buildPlaceholderGraphic(String? imageUrl) {
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => const Center(
-          child: Icon(Icons.checkroom_rounded, size: 80, color: AppTheme.brownMedium),
-        ),
-      );
-    }
-    return const Center(
-      child: Icon(Icons.checkroom_rounded, size: 80, color: AppTheme.brownMedium),
-    );
-  }
-
-  Widget _buildToggleButton({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.terracotta : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
         ),
       ),
     );
@@ -969,9 +1504,12 @@ class FullScreenVtonViewer extends StatefulWidget {
   final VirtualFittingResult? tryOnResult;
   /// Bytes de la imagen generada por IDM-VTON (prioridad sobre tryOnResult URL).
   final Uint8List? idmResultBytes;
-  final bool initialShowAfter;
+  final FittingViewerMode initialViewerMode;
   final String? selectedSize;
+  final Offset initialOffset;
+  final double initialScale;
   final VoidCallback onAddToCart;
+  final Future<void> Function(ImageSource source)? onPickImage;
 
   const FullScreenVtonViewer({
     super.key,
@@ -979,9 +1517,12 @@ class FullScreenVtonViewer extends StatefulWidget {
     required this.userImageFile,
     required this.tryOnResult,
     this.idmResultBytes,
-    required this.initialShowAfter,
+    required this.initialViewerMode,
     required this.selectedSize,
+    this.initialOffset = Offset.zero,
+    this.initialScale = 1.0,
     required this.onAddToCart,
+    this.onPickImage,
   });
 
   @override
@@ -989,18 +1530,58 @@ class FullScreenVtonViewer extends StatefulWidget {
 }
 
 class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
-  late bool _showAfter;
+  late FittingViewerMode _viewerMode;
+  late Offset _garmentOffset;
+  late double _garmentScale;
 
   @override
   void initState() {
     super.initState();
-    _showAfter = widget.initialShowAfter;
+    _viewerMode = widget.initialViewerMode;
+    _garmentOffset = widget.initialOffset;
+    _garmentScale = widget.initialScale;
+  }
+
+  Map<String, dynamic> _getGarmentPositioning(Product? product) {
+    if (product == null) {
+      return {'alignment': const Alignment(0.0, -0.18), 'heightFraction': 0.46};
+    }
+    final text = '${product.category} ${product.name}'.toLowerCase();
+    if (text.contains('pantal') ||
+        text.contains('jean') ||
+        text.contains('short') ||
+        text.contains('falda') ||
+        text.contains('bermuda') ||
+        text.contains('pants')) {
+      return {'alignment': const Alignment(0.0, 0.48), 'heightFraction': 0.52};
+    }
+    if (text.contains('vestid') ||
+        text.contains('enteriz') ||
+        text.contains('overol') ||
+        text.contains('traje')) {
+      return {'alignment': const Alignment(0.0, 0.08), 'heightFraction': 0.74};
+    }
+    if (text.contains('zapato') ||
+        text.contains('zapatilla') ||
+        text.contains('bota') ||
+        text.contains('sandalia')) {
+      return {'alignment': const Alignment(0.0, 0.88), 'heightFraction': 0.22};
+    }
+    return {'alignment': const Alignment(0.0, -0.22), 'heightFraction': 0.46};
+  }
+
+  Widget _buildGarmentImage(String? imageUrl, {BoxFit fit = BoxFit.contain, bool removeWhiteBg = true}) {
+    return TransparentGarmentWidget(
+      imageUrl: imageUrl,
+      fit: fit,
+      removeWhiteBg: removeWhiteBg,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final hasIdmResult = widget.idmResultBytes != null && widget.idmResultBytes!.isNotEmpty;
-    final hasResult = hasIdmResult || widget.tryOnResult != null;
+    final hasAiResult = hasIdmResult || widget.tryOnResult != null;
     final hasUserPhoto = widget.userImageFile != null;
     final garmentImg = widget.product?.imageUrl;
 
@@ -1015,159 +1596,327 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         actions: [
-          if (hasResult || hasUserPhoto)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+          if (widget.onPickImage != null)
+            PopupMenuButton<ImageSource>(
+              tooltip: 'Subir o cambiar foto',
+              onSelected: (source) async {
+                await widget.onPickImage!(source);
+                if (mounted) setState(() {});
+              },
+              color: AppTheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: ImageSource.camera,
+                  child: Row(
+                    children: [
+                      Icon(Icons.camera_alt_outlined, color: AppTheme.terracotta, size: 18),
+                      SizedBox(width: 8),
+                      Text('Tomar Foto'),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () => setState(() => _showAfter = false),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: !_showAfter ? AppTheme.terracotta : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Prenda',
-                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _showAfter = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _showAfter ? AppTheme.terracotta : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Look IA ✨',
-                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
+                const PopupMenuItem(
+                  value: ImageSource.gallery,
+                  child: Row(
+                    children: [
+                      Icon(Icons.photo_library_outlined, color: AppTheme.terracotta, size: 18),
+                      SizedBox(width: 8),
+                      Text('Elegir de Galería'),
+                    ],
+                  ),
+                ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Icon(
+                  hasUserPhoto ? Icons.edit_rounded : Icons.add_a_photo_rounded,
+                  color: Colors.white,
+                  size: 22,
                 ),
               ),
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Imagen con zoom interactivo
-          Center(
-            child: InteractiveViewer(
-              minScale: 0.8,
-              maxScale: 4.0,
-              child: _buildMainImage(garmentImg, hasResult, hasIdmResult),
-            ),
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final h = constraints.maxHeight;
+          final pos = _getGarmentPositioning(widget.product);
+          final Alignment defaultAlignment = pos['alignment'] as Alignment;
+          final double heightFraction = pos['heightFraction'] as double;
+          final double baseHeight = h * heightFraction;
 
-          // Barra flotante inferior con información y botón de compra
-          Positioned(
-            bottom: 24,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          return Stack(
+            children: [
+              // 1. Capa de Fondo (Persona / Look IA / Prenda)
+              Positioned.fill(
+                child: _buildMainViewerContent(garmentImg, hasAiResult, hasIdmResult),
               ),
-              child: Row(
-                children: [
-                  Expanded(
+
+              // 2. Capa Prenda PNG Superpuesta e interactiva sobre la persona
+              if (_viewerMode == FittingViewerMode.overlay && widget.product != null)
+                Positioned.fill(
+                  child: Center(
+                    child: Transform.translate(
+                      offset: _garmentOffset,
+                      child: Transform.scale(
+                        scale: _garmentScale,
+                        child: Align(
+                          alignment: defaultAlignment,
+                          child: GestureDetector(
+                            onPanUpdate: (details) {
+                              setState(() {
+                                _garmentOffset += details.delta;
+                              });
+                            },
+                            child: Container(
+                              constraints: BoxConstraints(
+                                maxHeight: baseHeight,
+                                maxWidth: 360,
+                              ),
+                              child: _buildGarmentImage(garmentImg, fit: BoxFit.contain),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 3. Selector de Modo en Barra Flotante Superior
+              Positioned(
+                top: 14,
+                left: 14,
+                right: 14,
+                child: Center(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildPill('👗 Prenda sobre ti', FittingViewerMode.overlay),
+                          if (hasAiResult)
+                            _buildPill('✨ Look IA', FittingViewerMode.aiResult),
+                          if (hasUserPhoto)
+                            _buildPill('👤 Mi Foto', FittingViewerMode.userPhoto),
+                          _buildPill('👕 Prenda', FittingViewerMode.garment),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 4. Controles flotantes de escala y recentrado en modo overlay
+              if (_viewerMode == FittingViewerMode.overlay && widget.product != null)
+                Positioned(
+                  right: 16,
+                  bottom: 100,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Talla: ${widget.selectedSize ?? "M"}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                          tooltip: 'Agrandar prenda',
+                          onPressed: () {
+                            setState(() {
+                              if (_garmentScale < 2.5) _garmentScale += 0.08;
+                            });
+                          },
                         ),
-                        if (widget.tryOnResult != null)
-                          Text(
-                            '${widget.tryOnResult!.confidenceScore.toStringAsFixed(0)}% coincidencia biométrica',
-                            style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
-                          ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 22),
+                          tooltip: 'Reducir prenda',
+                          onPressed: () {
+                            setState(() {
+                              if (_garmentScale > 0.4) _garmentScale -= 0.08;
+                            });
+                          },
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 22),
+                          tooltip: 'Centrar prenda',
+                          onPressed: () {
+                            setState(() {
+                              _garmentOffset = Offset.zero;
+                              _garmentScale = 1.0;
+                            });
+                          },
+                        ),
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      widget.onAddToCart();
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
-                    label: const Text('Comprar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.terracotta,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+
+              // 5. Hint inferior en modo overlay
+              if (_viewerMode == FittingViewerMode.overlay)
+                Positioned(
+                  bottom: 96,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.touch_app_rounded, color: Colors.white70, size: 14),
+                        SizedBox(width: 5),
+                        Text(
+                          'Arrastra con el dedo para calzar la prenda',
+                          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
+
+              // 6. Barra flotante inferior con información y botón de compra
+              Positioned(
+                bottom: 24,
+                left: 20,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Talla: ${widget.selectedSize ?? "M"}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            if (widget.tryOnResult != null)
+                              Text(
+                                '${widget.tryOnResult!.confidenceScore.toStringAsFixed(0)}% coincidencia biométrica',
+                                style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
+                              ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          widget.onAddToCart();
+                          Navigator.pop(context);
+                        },
+                        icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
+                        label: const Text('Comprar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.terracotta,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMainImage(String? garmentImg, bool hasResult, bool hasIdmResult) {
-    // Prioridad 1: imagen real de IDM-VTON como bytes
-    if (_showAfter && hasIdmResult) {
-      return Image.memory(
-        widget.idmResultBytes!,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => _fallbackGraphic(garmentImg),
-      );
-    }
-
-    if (widget.userImageFile != null && (!_showAfter || !hasResult)) {
-      return Image.file(
-        File(widget.userImageFile!.path),
-        fit: BoxFit.contain,
-      );
-    }
-
-    if (widget.tryOnResult != null && _showAfter) {
-      return Image.network(
-        widget.tryOnResult!.resultImageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => _fallbackGraphic(garmentImg),
-      );
-    }
-
-    return _fallbackGraphic(garmentImg);
+  Widget _buildPill(String label, FittingViewerMode mode) {
+    final isSel = _viewerMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _viewerMode = mode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSel ? AppTheme.terracotta : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget _fallbackGraphic(String? garmentImg) {
-    if (garmentImg != null && garmentImg.isNotEmpty) {
-      return Image.network(
-        garmentImg,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => const Icon(
-          Icons.checkroom_rounded,
-          size: 120,
-          color: Colors.white54,
-        ),
-      );
+  Widget _buildMainViewerContent(String? garmentImg, bool hasAiResult, bool hasIdmResult) {
+    switch (_viewerMode) {
+      case FittingViewerMode.overlay:
+        if (widget.userImageFile != null) {
+          return Image.file(
+            File(widget.userImageFile!.path),
+            fit: BoxFit.contain,
+          );
+        }
+        return Container(
+          color: const Color(0xFF141210),
+          child: const Center(
+            child: Icon(Icons.accessibility_new_rounded, size: 300, color: Colors.white12),
+          ),
+        );
+
+      case FittingViewerMode.aiResult:
+        if (hasIdmResult) {
+          return Image.memory(
+            widget.idmResultBytes!,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+          );
+        }
+        if (widget.tryOnResult != null) {
+          return Image.network(
+            widget.tryOnResult!.resultImageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+          );
+        }
+        return _buildGarmentImage(garmentImg);
+
+      case FittingViewerMode.userPhoto:
+        if (widget.userImageFile != null) {
+          return Image.file(
+            File(widget.userImageFile!.path),
+            fit: BoxFit.contain,
+          );
+        }
+        return const Center(
+          child: Icon(Icons.person_rounded, size: 120, color: Colors.white24),
+        );
+
+      case FittingViewerMode.garment:
+        return Center(
+          child: _buildGarmentImage(garmentImg, fit: BoxFit.contain),
+        );
     }
-    return const Icon(
-      Icons.checkroom_rounded,
-      size: 120,
-      color: Colors.white54,
-    );
   }
 }

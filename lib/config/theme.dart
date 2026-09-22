@@ -60,15 +60,31 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: errorColor),
+          borderSide: const BorderSide(color: errorColor, width: 2.0),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: errorColor, width: 1.5),
+          borderSide: const BorderSide(color: errorColor, width: 2.5),
+        ),
+        errorStyle: const TextStyle(
+          color: errorColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 12.5,
         ),
         labelStyle: const TextStyle(color: brownMedium),
         hintStyle: TextStyle(color: brownMedium.withValues(alpha: 0.6)),
         prefixIconColor: brownMedium,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: const Color(0xFF991B1B),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 6,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

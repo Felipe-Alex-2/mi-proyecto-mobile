@@ -623,17 +623,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildPriceRow(Product product) {
     final curVar = _selectedVariant;
-    final curPrice = (curVar != null && curVar.price > 0)
+    final basePrice = (curVar != null && curVar.price > 0)
         ? curVar.price
         : (product.basePrice > 0 ? product.basePrice : product.minPrice);
+    final curPrice = product.hasDiscount ? (basePrice * (1.0 - (product.discountPercent! / 100.0))) : basePrice;
     final availableStock = curVar != null ? curVar.totalStock : _totalStockForSelection;
 
     return Row(
       children: [
-        Text(
-          'Bs ${curPrice.toStringAsFixed(2)}',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
-        ),
+        if (product.hasDiscount) ...[
+          Text(
+            '\$ ${basePrice.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16,
+              decoration: TextDecoration.lineThrough,
+              decorationColor: Colors.grey.shade600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '\$ ${curPrice.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFC1121F)),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE63946),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🏷️', style: TextStyle(fontSize: 11)),
+                const SizedBox(width: 4),
+                Text(
+                  '-${product.discountPercent!.toStringAsFixed(0)}% OFF',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Text(
+            '\$ ${curPrice.toStringAsFixed(2)}',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
+          ),
+        ],
         const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -980,7 +1021,7 @@ class _VariantTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'Bs ${(variant.price > 0 ? variant.price : fallbackPrice).toStringAsFixed(2)}',
+                '\$ ${(variant.price > 0 ? variant.price : fallbackPrice).toStringAsFixed(2)}',
                 style: const TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold, fontSize: 13),
               ),
               Text(

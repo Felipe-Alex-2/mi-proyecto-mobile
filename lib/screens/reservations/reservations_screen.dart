@@ -352,7 +352,7 @@ class _ReservationCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Bs ${it.price.toStringAsFixed(2)}',
+                      '\$ ${it.price.toStringAsFixed(2)}',
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.brownMedium),
                     ),
                   ],
@@ -369,7 +369,7 @@ class _ReservationCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 13, color: AppTheme.brownMedium),
               ),
               Text(
-                'Bs ${(reservation.totalAmount ?? reservation.totalEstimatedAmount).toStringAsFixed(2)}',
+                '\$ ${(reservation.totalAmount ?? reservation.totalEstimatedAmount).toStringAsFixed(2)}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

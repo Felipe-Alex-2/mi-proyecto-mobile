@@ -26,7 +26,24 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Por favor completa los campos obligatorios marcados en rojo.'),
+              ),
+            ],
+          ),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     final authService = context.read<AuthService>();
     final success = await authService.login(
@@ -39,7 +56,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!success && authService.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authService.errorMessage!),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(authService.errorMessage!)),
+            ],
+          ),
           backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
@@ -58,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -110,9 +133,40 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppTheme.brownMedium,
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 24),
 
-                    // Email Field
+                    // In-card Error Banner
+                    if (authService.errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                authService.errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xFF991B1B),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Email Fieldd
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,

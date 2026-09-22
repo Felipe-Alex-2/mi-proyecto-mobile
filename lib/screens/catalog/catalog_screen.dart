@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -461,6 +461,41 @@ class _ProductCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (product.hasDiscount)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE63946),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: 5,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('🏷️', style: TextStyle(fontSize: 10)),
+                            const SizedBox(width: 3),
+                            Text(
+                              '-${product.discountPercent!.toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -491,15 +526,42 @@ class _ProductCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // Price in Bolivianos (Bs)
-                  Text(
-                    _priceText(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: AppTheme.terracotta,
+                  // Price in Dollars ($ USD) with active discount calculation
+                  if (product.hasDiscount)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          _priceText(),
+                          style: TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            decorationColor: Colors.grey.shade600,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _discountedPriceText(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFFC1121F),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      _priceText(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppTheme.terracotta,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 6),
                   _buildColorDots(),
                 ],
@@ -512,11 +574,22 @@ class _ProductCard extends StatelessWidget {
   }
 
   String _priceText() {
-    if (product.variants.isEmpty) return 'Bs 0';
+    if (product.variants.isEmpty) return '\$0';
     if (product.minPrice == product.maxPrice) {
-      return 'Bs ${product.minPrice.toStringAsFixed(0)}';
+      return '\$${product.minPrice.toStringAsFixed(0)}';
     }
-    return 'Bs ${product.minPrice.toStringAsFixed(0)} - Bs ${product.maxPrice.toStringAsFixed(0)}';
+    return '\$${product.minPrice.toStringAsFixed(0)} - \$${product.maxPrice.toStringAsFixed(0)}';
+  }
+
+  String _discountedPriceText() {
+    if (product.variants.isEmpty) return '\$0';
+    final factor = 1.0 - (product.discountPercent! / 100.0);
+    final discMin = product.minPrice * factor;
+    final discMax = product.maxPrice * factor;
+    if (product.minPrice == product.maxPrice) {
+      return '\$${discMin.toStringAsFixed(0)}';
+    }
+    return '\$${discMin.toStringAsFixed(0)} - \$${discMax.toStringAsFixed(0)}';
   }
 
   Widget _buildImage() {

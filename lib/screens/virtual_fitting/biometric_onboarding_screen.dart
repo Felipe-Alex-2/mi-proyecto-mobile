@@ -63,7 +63,24 @@ class _BiometricOnboardingScreenState extends State<BiometricOnboardingScreen> {
   }
 
   void _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Por favor completa o corrige todas tus medidas marcadas en rojo.'),
+              ),
+            ],
+          ),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
     try {
@@ -374,13 +391,26 @@ class _BiometricOnboardingScreenState extends State<BiometricOnboardingScreen> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppTheme.terracotta, width: 2),
             ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.errorColor, width: 2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.errorColor, width: 2.5),
+            ),
+            errorStyle: const TextStyle(
+              color: AppTheme.errorColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
           ),
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return 'Requerido';
+            if (val == null || val.trim().isEmpty) return '$label es obligatorio';
             final numVal = double.tryParse(val.trim());
             if (numVal == null) return 'Ingresa un número válido';
             if (numVal < minVal || numVal > maxVal) {
-              return 'Rango sugerido: $minVal - $maxVal $unit';
+              return 'Rango válido: $minVal - $maxVal $unit';
             }
             return null;
           },

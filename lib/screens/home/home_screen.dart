@@ -254,7 +254,7 @@ class _HomeDashboardTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Explora nuestro catálogo en Bolivianos (Bs), arma tu carrito y reserva tus prendas favoritas para probártelas en tienda física.',
+                    'Explora nuestro catálogo en Dólares (\$ USD), arma tu carrito y reserva tus prendas favoritas para probártelas en tienda física.',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
                   ),
                 ],
@@ -317,7 +317,7 @@ class _HomeDashboardTab extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildInfoRow('Email', user?.email ?? '-'),
                     const SizedBox(height: 12),
-                    _buildInfoRow('Moneda del Sistema', 'Bolivianos (Bs)'),
+                    _buildInfoRow('Moneda del Sistema', 'Dólares (\$ USD)'),
                     const SizedBox(height: 12),
                     _buildInfoRow('Estado', user?.isActive == true ? 'Activo ✅' : 'Inactivo'),
                   ],

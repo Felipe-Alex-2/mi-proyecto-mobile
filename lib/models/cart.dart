@@ -1,4 +1,4 @@
-﻿class CartItem {
+class CartItem {
   final String id;
   final String variantId;
   final int quantity;
@@ -9,6 +9,8 @@
   final String? colorName;
   final String? colorHex;
   final double price;
+  final double? originalPrice;
+  final double? discountPercent;
   final double subtotal;
   final String? imageUrl;
   final int availableStock;
@@ -24,10 +26,14 @@
     this.colorName,
     this.colorHex,
     required this.price,
+    this.originalPrice,
+    this.discountPercent,
     required this.subtotal,
     this.imageUrl,
     this.availableStock = 0,
   });
+
+  bool get hasDiscount => discountPercent != null && discountPercent! > 0;
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
@@ -41,6 +47,8 @@
       colorName: json['color_name'],
       colorHex: json['color_hex'],
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      originalPrice: (json['original_price'] as num?)?.toDouble(),
+      discountPercent: (json['discount_percent'] as num?)?.toDouble(),
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       imageUrl: json['image_url'],
       availableStock: json['available_stock'] ?? 0,

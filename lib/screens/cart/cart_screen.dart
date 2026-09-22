@@ -99,7 +99,7 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Prendas: ${cart.totalItems} | Total: Bs ${cart.totalAmount.toStringAsFixed(2)}',
+                    'Prendas: ${cart.totalItems} | Total: \$ ${cart.totalAmount.toStringAsFixed(2)}',
                     style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 16),
@@ -401,7 +401,7 @@ class _CartScreenState extends State<CartScreen> {
                             )
                           : Text(
                               isPayPal
-                                  ? 'Pagar con PayPal (Bs ${cart.totalAmount.toStringAsFixed(2)})'
+                                  ? 'Pagar con PayPal (\$ ${cart.totalAmount.toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
                               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
                             ),
@@ -608,7 +608,7 @@ class _CartScreenState extends State<CartScreen> {
               const SizedBox(height: 8),
               Text('Sucursal: ${r.branchName ?? "Seleccionada"}', style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
-              Text('Total: Bs ${(r.totalAmount ?? r.totalEstimatedAmount).toStringAsFixed(2)}'),
+              Text('Total: \$ ${(r.totalAmount ?? r.totalEstimatedAmount).toStringAsFixed(2)}'),
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
@@ -800,7 +800,7 @@ class _CartScreenState extends State<CartScreen> {
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.brownMedium),
                           ),
                           Text(
-                            'Bs ${cart.totalAmount.toStringAsFixed(2)}',
+                            '\$ ${cart.totalAmount.toStringAsFixed(2)}',
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
                           ),
                         ],
@@ -998,10 +998,43 @@ class _CartItemCard extends StatelessWidget {
                     style: const TextStyle(color: AppTheme.brownMedium, fontSize: 11),
                   ),
                 const SizedBox(height: 6),
-                Text(
-                  'Bs ${item.price.toStringAsFixed(2)} c/u',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.terracotta, fontSize: 13),
-                ),
+                if (item.hasDiscount && item.originalPrice != null) ...[
+                  Row(
+                    children: [
+                      Text(
+                        '\$ ${item.originalPrice!.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Colors.grey.shade600,
+                          color: Colors.grey.shade600,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '\$ ${item.price.toStringAsFixed(2)} c/u',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC1121F), fontSize: 13),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE63946),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '-${item.discountPercent!.toStringAsFixed(0)}%',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  Text(
+                    '\$ ${item.price.toStringAsFixed(2)} c/u',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.terracotta, fontSize: 13),
+                  ),
+                ],
               ],
             ),
           ),

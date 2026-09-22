@@ -203,12 +203,36 @@ class ApiService {
 
     String errorMessage = 'Ocurrió un error inesperado';
     if (decodedBody is Map) {
-      if (decodedBody.containsKey('detail')) {
+      if (decodedBody.containsKey('errors') &&
+          decodedBody['errors'] is List &&
+          (decodedBody['errors'] as List).isNotEmpty) {
+        final errList = decodedBody['errors'] as List;
+        final formatted = errList.map((e) {
+          if (e is Map) {
+            final f = e['field_label'] ?? e['field'] ?? '';
+            final m = e['message'] ?? '';
+            return f.toString().isNotEmpty ? '• $f: $m' : '• $m';
+          }
+          return '• ${e.toString()}';
+        }).join('\n');
+        errorMessage = 'Errores de validación:\n$formatted';
+      } else if (decodedBody.containsKey('detail')) {
         final detail = decodedBody['detail'];
         if (detail is String) {
           errorMessage = detail;
         } else if (detail is List && detail.isNotEmpty) {
-          errorMessage = detail[0]['msg'] ?? 'Error de validación';
+          final formatted = detail.map((e) {
+            if (e is Map) {
+              final loc = (e['loc'] as List?)
+                      ?.where((l) => l != 'body')
+                      .join(' -> ') ??
+                  '';
+              final m = e['msg'] ?? '';
+              return loc.isNotEmpty ? '• $loc: $m' : '• $m';
+            }
+            return '• ${e.toString()}';
+          }).join('\n');
+          errorMessage = 'Datos inválidos:\n$formatted';
         }
       } else if (decodedBody.containsKey('message')) {
         errorMessage = decodedBody['message'];

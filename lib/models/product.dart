@@ -1,4 +1,4 @@
-﻿class Stock {
+class Stock {
   final String id;
   final String branchId;
   final String branchName;
@@ -77,6 +77,9 @@ class Product {
   final String gender;
   final String? imageUrl;
   final bool isActive;
+  final String? promotionId;
+  final String? promotionName;
+  final double? discountPercent;
   final List<ProductVariant> variants;
 
   const Product({
@@ -88,8 +91,18 @@ class Product {
     this.gender = 'Unisex',
     this.imageUrl,
     required this.isActive,
+    this.promotionId,
+    this.promotionName,
+    this.discountPercent,
     required this.variants,
   });
+
+  bool get hasDiscount => discountPercent != null && discountPercent! > 0;
+
+  double get discountedPrice {
+    if (!hasDiscount) return basePrice;
+    return basePrice * (1.0 - (discountPercent! / 100.0));
+  }
 
   int get totalStock => variants.fold(0, (sum, v) => sum + v.totalStock);
 
@@ -127,6 +140,9 @@ class Product {
       gender: json['gender']?.toString() ?? 'Unisex',
       imageUrl: json['image_url']?.toString(),
       isActive: json['is_active'] as bool? ?? true,
+      promotionId: json['promotion_id']?.toString(),
+      promotionName: json['promotion_name']?.toString(),
+      discountPercent: (json['discount_percent'] as num?)?.toDouble(),
       variants: variantsJson
           .map((v) => ProductVariant.fromJson(v as Map<String, dynamic>, defaultPrice: prodPrice))
           .toList(),
