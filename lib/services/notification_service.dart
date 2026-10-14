@@ -1,17 +1,25 @@
+import 'session_notifier.dart';
+
 import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+
 import '../models/notification_item.dart';
 import 'api_service.dart';
 
-class NotificationService extends ChangeNotifier {
+class NotificationService extends SessionNotifier {
   final ApiService _apiService;
   List<NotificationItem> _notifications = [];
   bool _isLoading = false;
   Timer? _pollingTimer;
 
-  NotificationService(this._apiService) {
-    startPolling();
-  }
+  NotificationService(this._apiService);
+
+  Future<void>? _pendingLoad;
+  String? _lastPayload;
+  int _generation = 0;
+  bool _disposed = false;
 
   List<NotificationItem> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -28,9 +36,34 @@ class NotificationService extends ChangeNotifier {
   void stopPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
+    _generation++;
+    _pendingLoad = null;
+    _isLoading = false;
   }
 
-  Future<void> loadNotifications({bool silent = false}) async {
+  void clearSession() {
+    stopPolling();
+    _notifications = [];
+    _lastPayload = null;
+  }
+
+  Future<void> loadNotifications({bool silent = false}) {
+    if (_disposed) return Future.value();
+    if (_pendingLoad != null) return _pendingLoad!;
+    final generation = _generation;
+    return _pendingLoad =
+        _loadNotifications(silent: silent, generation: generation).whenComplete(
+          () {
+            if (generation == _generation) _pendingLoad = null;
+          },
+        );
+  }
+
+  Future<void> _loadNotifications({
+    required bool silent,
+    required int generation,
+  }) async {
+    bool changed = false;
     if (!silent) {
       _isLoading = true;
       notifyListeners();
@@ -38,18 +71,23 @@ class NotificationService extends ChangeNotifier {
 
     try {
       final data = await _apiService.get('/notifications');
-      if (data is List) {
+      if (_disposed || generation != _generation) return;
+      if (data is List && jsonEncode(data) != _lastPayload) {
+        _lastPayload = jsonEncode(data);
+        changed = true;
         _notifications = data
-            .map((item) => NotificationItem.fromJson(item as Map<String, dynamic>))
+            .map(
+              (item) => NotificationItem.fromJson(item as Map<String, dynamic>),
+            )
             .toList();
       }
     } catch (e) {
       debugPrint('Error loading notifications: $e');
     } finally {
-      if (!silent) {
-        _isLoading = false;
+      if (!_disposed && generation == _generation) {
+        if (!silent) _isLoading = false;
+        if (!silent || changed) notifyListeners();
       }
-      notifyListeners();
     }
   }
 
@@ -99,6 +137,7 @@ class NotificationService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     stopPolling();
     super.dispose();
   }

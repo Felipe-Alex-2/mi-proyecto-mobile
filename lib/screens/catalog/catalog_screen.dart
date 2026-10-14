@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/theme.dart';
-import '../../models/product.dart';
 import '../../services/catalog_service.dart';
-import 'product_detail_screen.dart';
+import '../../widgets/garment_card.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -20,7 +19,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CatalogService>().loadProducts();
+      if (!mounted) return;
+      final catalog = context.read<CatalogService>();
+      if (catalog.status == CatalogStatus.idle ||
+          catalog.status == CatalogStatus.error) {
+        catalog.loadProducts();
+      }
     });
   }
 
@@ -90,8 +94,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         selectedColor: AppTheme.terracotta,
                         backgroundColor: AppTheme.creamLight,
                         labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppTheme.brownMedium,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.brownMedium,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                         onSelected: (_) {
                           catalog.setGender(g);
@@ -112,29 +120,40 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: [
-                      {'key': 'newest', 'label': 'Más recientes'},
-                      {'key': 'price_asc', 'label': 'Precio: menor a mayor'},
-                      {'key': 'price_desc', 'label': 'Precio: mayor a menor'},
-                      {'key': 'name_asc', 'label': 'Nombre A-Z'},
-                    ].map((s) {
-                      final isSelected = catalog.sortBy == s['key'];
-                      return ChoiceChip(
-                        label: Text(s['label']!),
-                        selected: isSelected,
-                        selectedColor: AppTheme.terracotta,
-                        backgroundColor: AppTheme.creamLight,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppTheme.brownMedium,
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                        onSelected: (_) {
-                          catalog.setSortBy(s['key']!);
-                          setModalState(() {});
-                        },
-                      );
-                    }).toList(),
+                    children:
+                        [
+                          {'key': 'newest', 'label': 'Más recientes'},
+                          {
+                            'key': 'price_asc',
+                            'label': 'Precio: menor a mayor',
+                          },
+                          {
+                            'key': 'price_desc',
+                            'label': 'Precio: mayor a menor',
+                          },
+                          {'key': 'name_asc', 'label': 'Nombre A-Z'},
+                        ].map((s) {
+                          final isSelected = catalog.sortBy == s['key'];
+                          return ChoiceChip(
+                            label: Text(s['label']!),
+                            selected: isSelected,
+                            selectedColor: AppTheme.terracotta,
+                            backgroundColor: AppTheme.creamLight,
+                            labelStyle: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppTheme.brownMedium,
+                              fontSize: 12,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                            onSelected: (_) {
+                              catalog.setSortBy(s['key']!);
+                              setModalState(() {});
+                            },
+                          );
+                        }).toList(),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -150,7 +169,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                       ),
                       child: const Text(
                         'Aplicar Filtros',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -166,24 +188,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.cream,
+      backgroundColor: AppTheme.creamLight,
       appBar: AppBar(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: AppTheme.creamLight,
         elevation: 0,
         foregroundColor: AppTheme.brown,
-        title: const Row(
-          children: [
-            Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Catálogo Digital',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: AppTheme.brown,
-              ),
-            ),
-          ],
+        title: Text(
+          'Catálogo',
+          style: AppTheme.editorial.copyWith(fontSize: 32),
         ),
         actions: [
           IconButton(
@@ -193,7 +205,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ),
           Consumer<CatalogService>(
             builder: (_, catalog, _) => IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: AppTheme.brownMedium,
+              ),
               tooltip: 'Actualizar',
               onPressed: catalog.loadProducts,
             ),
@@ -212,7 +227,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget _buildSearchAndFilter() {
     return Consumer<CatalogService>(
       builder: (_, catalog, _) => Container(
-        color: AppTheme.surface,
+        color: AppTheme.creamLight,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           children: [
@@ -223,11 +238,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
                     controller: _searchController,
                     onChanged: catalog.setSearch,
                     decoration: InputDecoration(
-                      hintText: 'Buscar prendas, SKU...',
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.brownMedium),
+                      hintText: 'Buscar prendas',
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: AppTheme.brownMedium,
+                      ),
                       suffixIcon: catalog.searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, color: AppTheme.brownMedium),
+                              icon: const Icon(
+                                Icons.clear_rounded,
+                                color: AppTheme.brownMedium,
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                                 catalog.setSearch('');
@@ -239,13 +260,38 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
-                  icon: const Icon(Icons.filter_list_rounded, color: AppTheme.terracotta),
+                  icon: const Icon(
+                    Icons.filter_list_rounded,
+                    color: AppTheme.terracotta,
+                  ),
                   tooltip: 'Filtros',
                   onPressed: () => _showFilterModal(context),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: ['Todos', 'Mujer', 'Hombre', 'Unisex'].map((gender) {
+                  final selected = catalog.selectedGender == gender;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(gender),
+                      selected: selected,
+                      showCheckmark: false,
+                      labelStyle: TextStyle(
+                        color: selected ? Colors.white : AppTheme.brownMedium,
+                      ),
+                      onSelected: (_) => catalog.setGender(gender),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
             // Category chips
             if (catalog.categories.length > 1)
               SizedBox(
@@ -262,9 +308,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         selectedColor: AppTheme.terracotta,
                         backgroundColor: AppTheme.creamLight,
                         labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppTheme.brownMedium,
+                          color: isSelected
+                              ? Colors.white
+                              : AppTheme.brownMedium,
                           fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                         side: BorderSide(
                           color: isSelected
@@ -293,7 +343,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
               children: [
                 CircularProgressIndicator(color: AppTheme.terracotta),
                 SizedBox(height: 16),
-                Text('Cargando catálogo...', style: TextStyle(color: AppTheme.brownMedium)),
+                Text(
+                  'Cargando catálogo...',
+                  style: TextStyle(color: AppTheme.brownMedium),
+                ),
               ],
             ),
           );
@@ -306,17 +359,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.wifi_off_rounded, size: 64, color: AppTheme.brownMedium),
+                  const Icon(
+                    Icons.wifi_off_rounded,
+                    size: 64,
+                    color: AppTheme.brownMedium,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'No se pudo cargar el catálogo',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.brown,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     catalog.errorMessage ?? 'Error desconocido',
-                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppTheme.brownMedium,
+                      fontSize: 13,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -340,21 +404,34 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.search_off_rounded, size: 64, color: AppTheme.brownMedium),
+                  const Icon(
+                    Icons.search_off_rounded,
+                    size: 64,
+                    color: AppTheme.brownMedium,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'Sin resultados',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.brown,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     catalog.searchQuery.isNotEmpty
                         ? 'No encontramos prendas para "${catalog.searchQuery}"'
                         : 'No hay prendas disponibles con los filtros actuales.',
-                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppTheme.brownMedium,
+                      fontSize: 13,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  if (catalog.searchQuery.isNotEmpty || catalog.selectedCategory != 'Todos' || catalog.selectedGender != 'Todos') ...[
+                  if (catalog.searchQuery.isNotEmpty ||
+                      catalog.selectedCategory != 'Todos' ||
+                      catalog.selectedGender != 'Todos') ...[
                     const SizedBox(height: 16),
                     OutlinedButton(
                       onPressed: () {
@@ -375,25 +452,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
           onRefresh: catalog.loadProducts,
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.65,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.sizeOf(context).width > 650 ? 3 : 2,
+              mainAxisExtent:
+                  315 + (MediaQuery.textScalerOf(context).scale(14) - 14) * 4,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
             itemCount: products.length,
             itemBuilder: (context, index) {
-              return _ProductCard(
-                product: products[index],
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProductDetailScreen(product: products[index]),
-                    ),
-                  );
-                },
-              );
+              return GarmentCard(product: products[index]);
             },
           ),
         );
@@ -401,261 +469,3 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
   }
 }
-
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  final VoidCallback onTap;
-
-  const _ProductCard({required this.product, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.creamLight),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.brown.withValues(alpha: 0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _buildImage(),
-                  if (!product.isAvailable)
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      child: const Center(
-                        child: Text(
-                          'Agotado',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ),
-                  if (product.gender.isNotEmpty)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.brown.withValues(alpha: 0.75),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          product.gender,
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  if (product.hasDiscount)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE63946),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('🏷️', style: TextStyle(fontSize: 10)),
-                            const SizedBox(width: 3),
-                            Text(
-                              '-${product.discountPercent!.toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // Info
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (product.category.isNotEmpty)
-                    Text(
-                      product.category.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.terracotta,
-                        letterSpacing: 0.5,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  // Price in Dollars ($ USD) with active discount calculation
-                  if (product.hasDiscount)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          _priceText(),
-                          style: TextStyle(
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Colors.grey.shade600,
-                            fontWeight: FontWeight.normal,
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _discountedPriceText(),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: Color(0xFFC1121F),
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Text(
-                      _priceText(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: AppTheme.terracotta,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  _buildColorDots(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _priceText() {
-    if (product.variants.isEmpty) return '\$0';
-    if (product.minPrice == product.maxPrice) {
-      return '\$${product.minPrice.toStringAsFixed(0)}';
-    }
-    return '\$${product.minPrice.toStringAsFixed(0)} - \$${product.maxPrice.toStringAsFixed(0)}';
-  }
-
-  String _discountedPriceText() {
-    if (product.variants.isEmpty) return '\$0';
-    final factor = 1.0 - (product.discountPercent! / 100.0);
-    final discMin = product.minPrice * factor;
-    final discMax = product.maxPrice * factor;
-    if (product.minPrice == product.maxPrice) {
-      return '\$${discMin.toStringAsFixed(0)}';
-    }
-    return '\$${discMin.toStringAsFixed(0)} - \$${discMax.toStringAsFixed(0)}';
-  }
-
-  Widget _buildImage() {
-    final url = product.imageUrl;
-    if (url == null || url.isEmpty) {
-      return Container(
-        color: AppTheme.creamLight,
-        child: const Icon(Icons.checkroom_rounded, size: 40, color: AppTheme.terracotta),
-      );
-    }
-    if (url.startsWith('data:image')) {
-      try {
-        final bytes = base64Decode(url.split(',').last);
-        return Image.memory(bytes, fit: BoxFit.cover);
-      } catch (_) {
-        return Container(color: AppTheme.creamLight);
-      }
-    }
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => Container(
-        color: AppTheme.creamLight,
-        child: const Icon(Icons.checkroom_rounded, size: 40, color: AppTheme.terracotta),
-      ),
-    );
-  }
-
-  Color _parseColor(String name) {
-    switch (name.toLowerCase()) {
-      case 'rojo': return Colors.red;
-      case 'azul': return Colors.blue;
-      case 'verde': return Colors.green;
-      case 'negro': return Colors.black;
-      case 'blanco': return Colors.white;
-      case 'gris': return Colors.grey;
-      case 'café':
-      case 'cafe': return Colors.brown;
-      case 'amarillo': return Colors.amber;
-      default: return AppTheme.terracotta;
-    }
-  }
-
-  Widget _buildColorDots() {
-    final colors = product.availableColors;
-    if (colors.isEmpty) return const SizedBox.shrink();
-    return Row(
-      children: [
-        ...colors.take(4).map((c) => Container(
-              width: 10,
-              height: 10,
-              margin: const EdgeInsets.only(right: 3),
-              decoration: BoxDecoration(
-                color: _parseColor(c),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.brownMedium.withValues(alpha: 0.3), width: 0.5),
-              ),
-            )),
-        if (colors.length > 4)
-          Text(
-            '+${colors.length - 4}',
-            style: const TextStyle(fontSize: 10, color: AppTheme.brownMedium),
-          ),
-      ],
-    );
-  }
-}
-
-

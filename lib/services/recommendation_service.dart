@@ -1,8 +1,10 @@
-import 'package:flutter/foundation.dart';
+import 'session_notifier.dart';
+
+
 import '../models/recommendation.dart';
 import 'api_service.dart';
 
-class RecommendationService extends ChangeNotifier {
+class RecommendationService extends SessionNotifier {
   final ApiService _api;
 
   RecommendationService(this._api);

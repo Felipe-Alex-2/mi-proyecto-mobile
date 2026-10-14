@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/theme.dart';
+import '../../widgets/product_photo.dart';
 import '../../models/product.dart';
 import '../../models/virtual_fitting_result.dart';
 import '../../services/cart_service.dart';
@@ -27,7 +30,8 @@ class VirtualFittingRoomScreen extends StatefulWidget {
   const VirtualFittingRoomScreen({super.key, this.initialProduct});
 
   @override
-  State<VirtualFittingRoomScreen> createState() => _VirtualFittingRoomScreenState();
+  State<VirtualFittingRoomScreen> createState() =>
+      _VirtualFittingRoomScreenState();
 }
 
 class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
@@ -98,7 +102,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   void _selectProduct(Product product) async {
     setState(() {
       _selectedProduct = product;
-      _selectedColor = product.availableColors.isNotEmpty ? product.availableColors.first : null;
+      _selectedColor = product.availableColors.isNotEmpty
+          ? product.availableColors.first
+          : null;
       _tryOnResult = null;
       _idmResultBytes = null;
       _garmentOffset = Offset.zero;
@@ -124,7 +130,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _selectedSize = product.availableSizes.isNotEmpty ? product.availableSizes.first : 'M';
+          _selectedSize = product.availableSizes.isNotEmpty
+              ? product.availableSizes.first
+              : 'M';
           _isLoadingRecommendation = false;
           _updateSelectedVariant();
         });
@@ -135,8 +143,12 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   void _updateSelectedVariant() {
     if (_selectedProduct == null) return;
     for (final v in _selectedProduct!.variants) {
-      final matchColor = _selectedColor == null || v.color.trim().toLowerCase() == _selectedColor!.trim().toLowerCase();
-      final matchSize = _selectedSize == null || v.size.trim().toLowerCase() == _selectedSize!.trim().toLowerCase();
+      final matchColor =
+          _selectedColor == null ||
+          v.color.trim().toLowerCase() == _selectedColor!.trim().toLowerCase();
+      final matchSize =
+          _selectedSize == null ||
+          v.size.trim().toLowerCase() == _selectedSize!.trim().toLowerCase();
       if (matchColor && matchSize) {
         _selectedVariantId = v.id;
         return;
@@ -201,9 +213,12 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           final mimeMatch = RegExp(r'data:image/(\w+);').firstMatch(garmentUrl);
           final ext = mimeMatch?.group(1) ?? 'jpg';
           garmentFilename = 'garment.$ext';
-        } else if (garmentUrl.startsWith('http://') || garmentUrl.startsWith('https://')) {
+        } else if (garmentUrl.startsWith('http://') ||
+            garmentUrl.startsWith('https://')) {
           // Caso 2: URL HTTP normal, descargar la imagen
-          final garmentResponse = await HttpClient().getUrl(Uri.parse(garmentUrl));
+          final garmentResponse = await HttpClient().getUrl(
+            Uri.parse(garmentUrl),
+          );
           final garmentHttpResponse = await garmentResponse.close();
           garmentBytes = Uint8List.fromList(
             await garmentHttpResponse.expand((chunk) => chunk).toList(),
@@ -221,7 +236,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           personImageBytes: personBytes,
           personFilename: personFilename,
           garmentImageBytes: garmentBytes,
-          garmentFilename: garmentFilename.isNotEmpty ? garmentFilename : 'garment.jpg',
+          garmentFilename: garmentFilename.isNotEmpty
+              ? garmentFilename
+              : 'garment.jpg',
           garmentDescription: garmentDesc,
         );
 
@@ -260,7 +277,8 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
         // Fallback al try-on simulado
       } catch (e) {
         if (!mounted) return;
-        final isServiceDown = e.toString().contains('503') ||
+        final isServiceDown =
+            e.toString().contains('503') ||
             e.toString().contains('no está disponible') ||
             e.toString().contains('VTON_URL');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -325,7 +343,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
     setState(() => _isAddingToCart = true);
     try {
-      await context.read<CartService>().addToCart(_selectedVariantId!, quantity: 1);
+      await context.read<CartService>().addToCart(
+        _selectedVariantId!,
+        quantity: 1,
+      );
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -336,7 +357,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
             label: 'Ver Carrito',
             textColor: Colors.white,
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
             },
           ),
         ),
@@ -344,7 +368,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al añadir: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error al añadir: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isAddingToCart = false);
@@ -358,21 +385,18 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     final profile = vtonService.profile;
 
     return Scaffold(
-      backgroundColor: AppTheme.cream,
+      backgroundColor: AppTheme.creamLight,
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.face_retouching_natural_rounded, color: AppTheme.terracotta, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Vestidor Virtual IA',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.brown),
-            ),
-          ],
+        title: Text(
+          'Vestidor virtual',
+          style: AppTheme.editorial.copyWith(fontSize: 26),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.straighten_rounded, color: AppTheme.terracotta),
+            icon: const Icon(
+              Icons.straighten_rounded,
+              color: AppTheme.terracotta,
+            ),
             tooltip: 'Ajustar mis medidas biométricas',
             onPressed: () {
               _promptBiometricMeasurements(profile);
@@ -380,18 +404,33 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: _buildBottomActions(vtonService.isTryingOn),
+      ),
       body: vtonService.isLoading && profile == null
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.terracotta))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.terracotta),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // 1. Visor de Imagen Virtual Try-On (Fase 4)
+                  _buildViewerTabs(vtonService.isTryingOn),
+                  const SizedBox(height: 12),
                   _buildTryOnViewer(vtonService.isTryingOn),
                   const SizedBox(height: 18),
 
                   // 2. Tarjeta de Recomendación de Talla y Fit de IA (Fase 2)
+                  if (_selectedProduct != null) ...[
+                    Text(
+                      _selectedProduct!.name,
+                      style: AppTheme.editorial.copyWith(fontSize: 26),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   _buildRecommendationCard(),
                   const SizedBox(height: 20),
 
@@ -406,8 +445,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                   ],
 
                   // 5. Botón de Compra Directa / Añadir al Carrito (Fase 5)
-                  _buildBottomActions(vtonService.isTryingOn),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -468,7 +506,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   }
 
   /// Helper para cargar imagen de prenda garantizando formato PNG sin fondo
-  Widget _buildGarmentImage(String? imageUrl, {BoxFit fit = BoxFit.contain, bool removeWhiteBg = true}) {
+  Widget _buildGarmentImage(
+    String? imageUrl, {
+    BoxFit fit = BoxFit.contain,
+    bool removeWhiteBg = true,
+  }) {
     return TransparentGarmentWidget(
       imageUrl: imageUrl,
       fit: fit,
@@ -486,7 +528,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       controller: controller,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
-      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 14,
+        color: AppTheme.brown,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 11, color: AppTheme.brownMedium),
@@ -505,14 +551,28 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
     );
   }
 
-  Future<void> _promptBiometricMeasurements(BiometricProfile? existingProfile) async {
+  Future<void> _promptBiometricMeasurements(
+    BiometricProfile? existingProfile,
+  ) async {
     final vtonService = context.read<VirtualFittingService>();
-    String selectedGender = (existingProfile?.gender.toUpperCase() == 'MUJER') ? 'MUJER' : 'HOMBRE';
-    final heightCtrl = TextEditingController(text: (existingProfile?.heightCm ?? 172.0).toStringAsFixed(0));
-    final weightCtrl = TextEditingController(text: (existingProfile?.weightKg ?? 70.0).toStringAsFixed(0));
-    final chestCtrl = TextEditingController(text: (existingProfile?.chestCm ?? 95.0).toStringAsFixed(0));
-    final waistCtrl = TextEditingController(text: (existingProfile?.waistCm ?? 82.0).toStringAsFixed(0));
-    final hipCtrl = TextEditingController(text: (existingProfile?.hipCm ?? 98.0).toStringAsFixed(0));
+    String selectedGender = (existingProfile?.gender.toUpperCase() == 'MUJER')
+        ? 'MUJER'
+        : 'HOMBRE';
+    final heightCtrl = TextEditingController(
+      text: (existingProfile?.heightCm ?? 172.0).toStringAsFixed(0),
+    );
+    final weightCtrl = TextEditingController(
+      text: (existingProfile?.weightKg ?? 70.0).toStringAsFixed(0),
+    );
+    final chestCtrl = TextEditingController(
+      text: (existingProfile?.chestCm ?? 95.0).toStringAsFixed(0),
+    );
+    final waistCtrl = TextEditingController(
+      text: (existingProfile?.waistCm ?? 82.0).toStringAsFixed(0),
+    );
+    final hipCtrl = TextEditingController(
+      text: (existingProfile?.hipCm ?? 98.0).toStringAsFixed(0),
+    );
     final formKey = GlobalKey<FormState>();
 
     await showModalBottomSheet(
@@ -546,10 +606,16 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppTheme.terracotta.withValues(alpha: 0.12),
+                              color: AppTheme.terracotta.withValues(
+                                alpha: 0.12,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.straighten_rounded, color: AppTheme.terracotta, size: 24),
+                            child: const Icon(
+                              Icons.straighten_rounded,
+                              color: AppTheme.terracotta,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           const Expanded(
@@ -567,7 +633,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                                 SizedBox(height: 2),
                                 Text(
                                   'Confirma tus medidas para calcular tu talla perfecta:',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.brownMedium,
+                                  ),
                                 ),
                               ],
                             ),
@@ -583,13 +652,23 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                             child: ChoiceChip(
                               label: const Center(child: Text('Hombre 👔')),
                               selected: selectedGender == 'HOMBRE',
-                              selectedColor: AppTheme.terracotta.withValues(alpha: 0.2),
+                              selectedColor: AppTheme.terracotta.withValues(
+                                alpha: 0.2,
+                              ),
                               labelStyle: TextStyle(
-                                color: selectedGender == 'HOMBRE' ? AppTheme.terracotta : AppTheme.brown,
-                                fontWeight: selectedGender == 'HOMBRE' ? FontWeight.bold : FontWeight.normal,
+                                color: selectedGender == 'HOMBRE'
+                                    ? AppTheme.terracotta
+                                    : AppTheme.brown,
+                                fontWeight: selectedGender == 'HOMBRE'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                               onSelected: (val) {
-                                if (val) setModalState(() => selectedGender = 'HOMBRE');
+                                if (val) {
+                                  setModalState(
+                                    () => selectedGender = 'HOMBRE',
+                                  );
+                                }
                               },
                             ),
                           ),
@@ -598,13 +677,21 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                             child: ChoiceChip(
                               label: const Center(child: Text('Mujer 👗')),
                               selected: selectedGender == 'MUJER',
-                              selectedColor: AppTheme.terracotta.withValues(alpha: 0.2),
+                              selectedColor: AppTheme.terracotta.withValues(
+                                alpha: 0.2,
+                              ),
                               labelStyle: TextStyle(
-                                color: selectedGender == 'MUJER' ? AppTheme.terracotta : AppTheme.brown,
-                                fontWeight: selectedGender == 'MUJER' ? FontWeight.bold : FontWeight.normal,
+                                color: selectedGender == 'MUJER'
+                                    ? AppTheme.terracotta
+                                    : AppTheme.brown,
+                                fontWeight: selectedGender == 'MUJER'
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                               onSelected: (val) {
-                                if (val) setModalState(() => selectedGender = 'MUJER');
+                                if (val) {
+                                  setModalState(() => selectedGender = 'MUJER');
+                                }
                               },
                             ),
                           ),
@@ -671,15 +758,25 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
                       // Botón principal
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                        icon: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         label: const Text(
                           'Calcular Talla y Probar Prendas',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.white,
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.terracotta,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
@@ -688,10 +785,15 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                           final messenger = ScaffoldMessenger.of(this.context);
                           final newProfile = BiometricProfile(
                             gender: selectedGender,
-                            heightCm: double.tryParse(heightCtrl.text.trim()) ?? 172.0,
-                            weightKg: double.tryParse(weightCtrl.text.trim()) ?? 70.0,
-                            chestCm: double.tryParse(chestCtrl.text.trim()) ?? 95.0,
-                            waistCm: double.tryParse(waistCtrl.text.trim()) ?? 82.0,
+                            heightCm:
+                                double.tryParse(heightCtrl.text.trim()) ??
+                                172.0,
+                            weightKg:
+                                double.tryParse(weightCtrl.text.trim()) ?? 70.0,
+                            chestCm:
+                                double.tryParse(chestCtrl.text.trim()) ?? 95.0,
+                            waistCm:
+                                double.tryParse(waistCtrl.text.trim()) ?? 82.0,
                             hipCm: double.tryParse(hipCtrl.text.trim()) ?? 98.0,
                           );
 
@@ -703,7 +805,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                             _selectProduct(_selectedProduct!);
                             messenger.showSnackBar(
                               SnackBar(
-                                content: Text('📏 Talla calculada para ${selectedGender.toLowerCase()}: ${_selectedSize ?? "M"}'),
+                                content: Text(
+                                  '📏 Talla calculada para ${selectedGender.toLowerCase()}: ${_selectedSize ?? "M"}',
+                                ),
                                 backgroundColor: AppTheme.terracotta,
                                 duration: const Duration(seconds: 3),
                               ),
@@ -718,7 +822,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                           onPressed: () => Navigator.pop(sheetContext),
                           child: Text(
                             'Continuar con medidas guardadas (${existingProfile.heightCm.toInt()}cm, ${existingProfile.weightKg.toInt()}kg)',
-                            style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                            style: const TextStyle(
+                              color: AppTheme.brownMedium,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -764,28 +871,53 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.35)),
+                    border: Border.all(
+                      color: AppTheme.terracotta.withValues(alpha: 0.35),
+                    ),
                   ),
                   child: Text(
                     profile != null
                         ? 'Modelo Biométrico: Altura ${profile.heightCm} cm • Pecho ${profile.chestCm} cm'
                         : 'Silueta del Vestidor Virtual',
-                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 ElevatedButton.icon(
                   onPressed: () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
-                  label: const Text('Subir mi foto para calzar prendas', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  icon: const Icon(
+                    Icons.camera_alt_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  label: const Text(
+                    'Subir mi foto para calzar prendas',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.terracotta.withValues(alpha: 0.9),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
                 ),
               ],
@@ -823,7 +955,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                     maxHeight: baseHeight,
                     maxWidth: 290,
                   ),
-                  child: _buildGarmentImage(_selectedProduct?.imageUrl, fit: BoxFit.contain),
+                  child: _buildGarmentImage(
+                    _selectedProduct?.imageUrl,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -834,28 +969,49 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   }
 
   /// Botón tipo pill para seleccionar el modo de visualización
-  Widget _buildModePill({
-    required String label,
-    required FittingViewerMode mode,
-  }) {
-    final isSelected = _viewerMode == mode;
-    return GestureDetector(
-      onTap: () => setState(() => _viewerMode = mode),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.terracotta : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
+  Widget _buildViewerTabs(bool isProcessing) {
+    final modes = <FittingViewerMode, String>{
+      FittingViewerMode.overlay: 'Sobre ti',
+      FittingViewerMode.userPhoto: 'Mi foto',
+      if (_idmResultBytes != null || _tryOnResult != null)
+        FittingViewerMode.aiResult: 'Look IA',
+      FittingViewerMode.garment: 'Prenda',
+    };
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.cream,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: modes.entries.map((entry) {
+          final selected = _viewerMode == entry.key;
+          return Expanded(
+            child: TextButton(
+              onPressed: isProcessing
+                  ? null
+                  : () => setState(() => _viewerMode = entry.key),
+              style: TextButton.styleFrom(
+                backgroundColor: selected
+                    ? AppTheme.terracotta
+                    : Colors.transparent,
+                foregroundColor: selected ? Colors.white : AppTheme.brownMedium,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+              child: Text(
+                entry.value,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -872,7 +1028,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           value: ImageSource.camera,
           child: Row(
             children: [
-              Icon(Icons.camera_alt_outlined, color: AppTheme.terracotta, size: 18),
+              Icon(
+                Icons.camera_alt_outlined,
+                color: AppTheme.terracotta,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Text('Tomar Foto'),
             ],
@@ -882,7 +1042,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           value: ImageSource.gallery,
           child: Row(
             children: [
-              Icon(Icons.photo_library_outlined, color: AppTheme.terracotta, size: 18),
+              Icon(
+                Icons.photo_library_outlined,
+                color: AppTheme.terracotta,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Text('Elegir de Galería'),
             ],
@@ -895,17 +1059,28 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           color: Colors.white.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 6,
+            ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add_a_photo_rounded, size: 14, color: AppTheme.terracotta),
+            const Icon(
+              Icons.add_a_photo_rounded,
+              size: 14,
+              color: AppTheme.terracotta,
+            ),
             const SizedBox(width: 5),
             Text(
               _userImageFile != null ? 'Cambiar Foto' : 'Subir Foto',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.brown),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.brown,
+              ),
             ),
           ],
         ),
@@ -922,10 +1097,7 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       case FittingViewerMode.overlay:
         // Vestidor Virtual: la persona de fondo (o avatar)
         if (_userImageFile != null) {
-          return Image.file(
-            File(_userImageFile!.path),
-            fit: BoxFit.cover,
-          );
+          return Image.file(File(_userImageFile!.path), fit: BoxFit.cover);
         }
         return _buildHumanSilhouette(vtonService);
 
@@ -934,24 +1106,23 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
           return Image.memory(
             _idmResultBytes!,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGarmentImage(garmentImg),
           );
         }
         if (_tryOnResult != null) {
           return Image.network(
             _tryOnResult!.resultImageUrl,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGarmentImage(garmentImg),
           );
         }
         return _buildGarmentImage(garmentImg);
 
       case FittingViewerMode.userPhoto:
         if (_userImageFile != null) {
-          return Image.file(
-            File(_userImageFile!.path),
-            fit: BoxFit.cover,
-          );
+          return Image.file(File(_userImageFile!.path), fit: BoxFit.cover);
         }
         return _buildHumanSilhouette(vtonService);
 
@@ -967,7 +1138,6 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
   Widget _buildTryOnViewer(bool isProcessing) {
     final hasIdmResult = _idmResultBytes != null && _idmResultBytes!.isNotEmpty;
     final hasAiResult = hasIdmResult || _tryOnResult != null;
-    final hasUserPhoto = _userImageFile != null;
 
     return Container(
       height: 420,
@@ -994,7 +1164,8 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
             ),
 
             // 2. Capa Prenda PNG Superpuesta e interactiva sobre la persona
-            if (_viewerMode == FittingViewerMode.overlay && _selectedProduct != null)
+            if (_viewerMode == FittingViewerMode.overlay &&
+                _selectedProduct != null)
               Positioned.fill(
                 child: _buildDraggableGarmentOverlay(containerHeight: 420),
               ),
@@ -1006,11 +1177,18 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(color: AppTheme.terracotta, strokeWidth: 3),
+                    CircularProgressIndicator(
+                      color: AppTheme.terracotta,
+                      strokeWidth: 3,
+                    ),
                     SizedBox(height: 16),
                     Text(
                       'Ajustando prenda con IA...',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     SizedBox(height: 6),
                     Text(
@@ -1021,73 +1199,38 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                 ),
               ),
 
-            // 4. Selector de Modos de Visualización (Pills en la parte superior izquierda)
-            if (!isProcessing)
-              Positioned(
-                top: 12,
-                left: 12,
-                right: 120,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildModePill(
-                          label: '👗 Prenda sobre ti',
-                          mode: FittingViewerMode.overlay,
-                        ),
-                        if (hasAiResult)
-                          _buildModePill(
-                            label: '✨ Look IA',
-                            mode: FittingViewerMode.aiResult,
-                          ),
-                        if (hasUserPhoto)
-                          _buildModePill(
-                            label: '👤 Mi Foto',
-                            mode: FittingViewerMode.userPhoto,
-                          ),
-                        _buildModePill(
-                          label: '👕 Prenda',
-                          mode: FittingViewerMode.garment,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
             // 5. Botón flotante para cambiar foto del usuario (superior derecha)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: _buildPhotoActionButton(),
-            ),
+            Positioned(top: 12, right: 12, child: _buildPhotoActionButton()),
 
             // 6. Controles interactivos de ajuste de la prenda antepuesta (Zoom +, Zoom -, Centrar)
-            if (_viewerMode == FittingViewerMode.overlay && !isProcessing && _selectedProduct != null)
+            if (_viewerMode == FittingViewerMode.overlay &&
+                !isProcessing &&
+                _selectedProduct != null)
               Positioned(
                 right: 12,
                 bottom: 74,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.add_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         tooltip: 'Agrandar prenda',
                         onPressed: () {
                           setState(() {
@@ -1097,7 +1240,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                       ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.remove_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         tooltip: 'Reducir prenda',
                         onPressed: () {
                           setState(() {
@@ -1107,7 +1254,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                       ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.restart_alt_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         tooltip: 'Centrar prenda',
                         onPressed: () {
                           setState(() {
@@ -1127,7 +1278,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                 bottom: 76,
                 left: 14,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(12),
@@ -1135,11 +1289,19 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.touch_app_rounded, color: Colors.white70, size: 14),
+                      Icon(
+                        Icons.touch_app_rounded,
+                        color: Colors.white70,
+                        size: 14,
+                      ),
                       SizedBox(width: 5),
                       Text(
                         'Arrastra para calzar la prenda',
-                        style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -1153,7 +1315,10 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                 left: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
@@ -1174,31 +1339,59 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                           children: [
                             Text(
                               _selectedProduct!.name,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               '\$ ${_selectedProduct!.basePrice.toStringAsFixed(2)} • ${_selectedProduct!.category}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 24),
+                        icon: const Icon(
+                          Icons.fullscreen_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                         tooltip: 'Pantalla completa',
                         onPressed: _openFullScreenViewer,
                       ),
                       const SizedBox(width: 4),
                       ElevatedButton.icon(
                         onPressed: isProcessing ? null : _runVirtualTryOn,
-                        icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.white),
-                        label: const Text('Look IA', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                        icon: const Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Look IA',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.terracotta,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ],
@@ -1213,117 +1406,79 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
   Widget _buildRecommendationCard() {
     if (_isLoadingRecommendation) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Row(
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
           children: [
-            SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.terracotta)),
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             SizedBox(width: 12),
-            Text('IA analizando tus medidas para este producto...', style: TextStyle(color: AppTheme.brownMedium, fontSize: 13)),
+            Expanded(
+              child: Text(
+                'Buscando tu talla ideal…',
+                style: TextStyle(color: AppTheme.brownMedium),
+              ),
+            ),
           ],
         ),
       );
     }
-
     final rec = _recommendation;
-    if (rec == null) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: AppTheme.sage,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: const Icon(Icons.straighten_rounded, color: AppTheme.sageInk),
+        title: Text(
+          rec == null
+              ? 'Encuentra tu talla ideal'
+              : 'Talla sugerida: ${rec.recommendedSize}',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.sageInk,
+          ),
+        ),
+        subtitle: const Text(
+          'Medidas y detalles de ajuste',
+          style: TextStyle(fontSize: 12, color: AppTheme.sageInk),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.terracotta.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.verified_rounded, color: AppTheme.terracotta, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Talla recomendada: Talla ${rec.recommendedSize}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.brown),
+          if (rec != null) ...[
+            Text(
+              '${rec.confidenceScore.toStringAsFixed(0)}% de confianza según tus medidas',
+              style: const TextStyle(fontSize: 12, color: AppTheme.sageInk),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: rec.fitDetails
+                  .map(
+                    (detail) => Chip(
+                      backgroundColor: AppTheme.surface,
+                      label: Text(
+                        '${detail.zone}: ${detail.fitStatus}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
-                    Text(
-                      '${rec.confidenceScore.toStringAsFixed(0)}% porcentaje de confianza biométrica',
-                      style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppTheme.creamLight),
-          const SizedBox(height: 10),
-
-          // Chips de diagnóstico de Fit
-          const Text(
-            'Simulación de Ajuste Anatómico:',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.brownMedium),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: rec.fitDetails.map((detail) {
-              Color chipBg;
-              Color chipText;
-              IconData chipIcon;
-
-              switch (detail.fitStatus) {
-                case 'AJUSTADO':
-                  chipBg = Colors.orange.shade50;
-                  chipText = Colors.orange.shade900;
-                  chipIcon = Icons.arrow_downward_rounded;
-                  break;
-                case 'HOLGADO':
-                  chipBg = Colors.blue.shade50;
-                  chipText = Colors.blue.shade900;
-                  chipIcon = Icons.arrow_upward_rounded;
-                  break;
-                default:
-                  chipBg = Colors.green.shade50;
-                  chipText = Colors.green.shade900;
-                  chipIcon = Icons.check_circle_rounded;
-              }
-
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: chipBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(chipIcon, size: 14, color: chipText),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${detail.zone}: ${detail.fitStatus}',
-                      style: TextStyle(color: chipText, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                  )
+                  .toList(),
+            ),
+          ],
+          TextButton.icon(
+            onPressed: () => _promptBiometricMeasurements(
+              context.read<VirtualFittingService>().profile,
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Editar medidas'),
           ),
         ],
       ),
@@ -1337,8 +1492,12 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Explora Prendas del Catálogo',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.brown),
+          'Elige una prenda',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.brown,
+          ),
         ),
         const SizedBox(height: 10),
         SizedBox(
@@ -1360,7 +1519,9 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isSelected ? AppTheme.terracotta : AppTheme.creamLight,
+                      color: isSelected
+                          ? AppTheme.terracotta
+                          : AppTheme.creamLight,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -1369,15 +1530,11 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: prod.imageUrl != null && prod.imageUrl!.isNotEmpty
-                            ? Image.network(
-                                prod.imageUrl!,
-                                width: 44,
-                                height: 44,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta),
-                              )
-                            : const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta),
+                        child: SizedBox(
+                          width: 54,
+                          height: 54,
+                          child: ProductPhoto(url: prod.imageUrl),
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Padding(
@@ -1386,8 +1543,12 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
                           prod.name,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? AppTheme.terracotta : AppTheme.brown,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: isSelected
+                                ? AppTheme.terracotta
+                                : AppTheme.brown,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1411,12 +1572,21 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
       children: [
         // Selector de Color
         if (product.availableColors.isNotEmpty) ...[
-          const Text('Color:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.brown)),
+          const Text(
+            'Color:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.brown,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: product.availableColors.map((color) {
-              final isSel = _selectedColor?.trim().toLowerCase() == color.trim().toLowerCase();
+              final isSel =
+                  _selectedColor?.trim().toLowerCase() ==
+                  color.trim().toLowerCase();
               return ChoiceChip(
                 label: Text(color),
                 selected: isSel,
@@ -1442,17 +1612,32 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
         // Selector de Talla (con indicador de IA)
         if (product.availableSizes.isNotEmpty) ...[
-          const Text('Talla:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.brown)),
+          const Text(
+            'Talla:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.brown,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: product.availableSizes.map((size) {
-              final isSel = _selectedSize?.trim().toLowerCase() == size.trim().toLowerCase();
-              final isAiRecommended = _recommendation?.recommendedSize.trim().toLowerCase() == size.trim().toLowerCase();
+              final isSel =
+                  _selectedSize?.trim().toLowerCase() ==
+                  size.trim().toLowerCase();
+              final isAiRecommended =
+                  _recommendation?.recommendedSize.trim().toLowerCase() ==
+                  size.trim().toLowerCase();
 
               return ChoiceChip(
                 avatar: isAiRecommended
-                    ? const Icon(Icons.auto_awesome_rounded, size: 14, color: Colors.amber)
+                    ? const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 14,
+                        color: Colors.amber,
+                      )
                     : null,
                 label: Text(isAiRecommended ? '$size (IA)' : size),
                 selected: isSel,
@@ -1480,19 +1665,36 @@ class _VirtualFittingRoomScreenState extends State<VirtualFittingRoomScreen> {
 
   Widget _buildBottomActions(bool isProcessing) {
     return ElevatedButton.icon(
-      onPressed: (_isAddingToCart || isProcessing) ? null : _addToCart,
+      onPressed: (_isAddingToCart || isProcessing || _selectedProduct == null)
+          ? null
+          : _addToCart,
       icon: _isAddingToCart
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          : const Icon(
+              Icons.shopping_bag_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
       label: Text(
-        _isAddingToCart ? 'Agregando...' : 'Añadir al Carrito (Talla ${_selectedSize ?? "M"})',
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+        _isAddingToCart ? 'Agregando...' : 'Añadir al carrito',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+          color: Colors.white,
+        ),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.terracotta,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        elevation: 3,
+        elevation: 0,
       ),
     );
   }
@@ -1502,6 +1704,7 @@ class FullScreenVtonViewer extends StatefulWidget {
   final Product? product;
   final XFile? userImageFile;
   final VirtualFittingResult? tryOnResult;
+
   /// Bytes de la imagen generada por IDM-VTON (prioridad sobre tryOnResult URL).
   final Uint8List? idmResultBytes;
   final FittingViewerMode initialViewerMode;
@@ -1570,7 +1773,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
     return {'alignment': const Alignment(0.0, -0.22), 'heightFraction': 0.46};
   }
 
-  Widget _buildGarmentImage(String? imageUrl, {BoxFit fit = BoxFit.contain, bool removeWhiteBg = true}) {
+  Widget _buildGarmentImage(
+    String? imageUrl, {
+    BoxFit fit = BoxFit.contain,
+    bool removeWhiteBg = true,
+  }) {
     return TransparentGarmentWidget(
       imageUrl: imageUrl,
       fit: fit,
@@ -1580,7 +1787,8 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final hasIdmResult = widget.idmResultBytes != null && widget.idmResultBytes!.isNotEmpty;
+    final hasIdmResult =
+        widget.idmResultBytes != null && widget.idmResultBytes!.isNotEmpty;
     final hasAiResult = hasIdmResult || widget.tryOnResult != null;
     final hasUserPhoto = widget.userImageFile != null;
     final garmentImg = widget.product?.imageUrl;
@@ -1593,7 +1801,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
         elevation: 0,
         title: Text(
           widget.product?.name ?? 'Vestidor Virtual',
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           if (widget.onPickImage != null)
@@ -1604,13 +1816,19 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                 if (mounted) setState(() {});
               },
               color: AppTheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               itemBuilder: (ctx) => [
                 const PopupMenuItem(
                   value: ImageSource.camera,
                   child: Row(
                     children: [
-                      Icon(Icons.camera_alt_outlined, color: AppTheme.terracotta, size: 18),
+                      Icon(
+                        Icons.camera_alt_outlined,
+                        color: AppTheme.terracotta,
+                        size: 18,
+                      ),
                       SizedBox(width: 8),
                       Text('Tomar Foto'),
                     ],
@@ -1620,7 +1838,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                   value: ImageSource.gallery,
                   child: Row(
                     children: [
-                      Icon(Icons.photo_library_outlined, color: AppTheme.terracotta, size: 18),
+                      Icon(
+                        Icons.photo_library_outlined,
+                        color: AppTheme.terracotta,
+                        size: 18,
+                      ),
                       SizedBox(width: 8),
                       Text('Elegir de Galería'),
                     ],
@@ -1650,11 +1872,16 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
             children: [
               // 1. Capa de Fondo (Persona / Look IA / Prenda)
               Positioned.fill(
-                child: _buildMainViewerContent(garmentImg, hasAiResult, hasIdmResult),
+                child: _buildMainViewerContent(
+                  garmentImg,
+                  hasAiResult,
+                  hasIdmResult,
+                ),
               ),
 
               // 2. Capa Prenda PNG Superpuesta e interactiva sobre la persona
-              if (_viewerMode == FittingViewerMode.overlay && widget.product != null)
+              if (_viewerMode == FittingViewerMode.overlay &&
+                  widget.product != null)
                 Positioned.fill(
                   child: Center(
                     child: Transform.translate(
@@ -1674,7 +1901,10 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                                 maxHeight: baseHeight,
                                 maxWidth: 360,
                               ),
-                              child: _buildGarmentImage(garmentImg, fit: BoxFit.contain),
+                              child: _buildGarmentImage(
+                                garmentImg,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
@@ -1696,16 +1926,24 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.75),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildPill('👗 Prenda sobre ti', FittingViewerMode.overlay),
+                          _buildPill(
+                            '👗 Prenda sobre ti',
+                            FittingViewerMode.overlay,
+                          ),
                           if (hasAiResult)
                             _buildPill('✨ Look IA', FittingViewerMode.aiResult),
                           if (hasUserPhoto)
-                            _buildPill('👤 Mi Foto', FittingViewerMode.userPhoto),
+                            _buildPill(
+                              '👤 Mi Foto',
+                              FittingViewerMode.userPhoto,
+                            ),
                           _buildPill('👕 Prenda', FittingViewerMode.garment),
                         ],
                       ),
@@ -1715,23 +1953,33 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
               ),
 
               // 4. Controles flotantes de escala y recentrado en modo overlay
-              if (_viewerMode == FittingViewerMode.overlay && widget.product != null)
+              if (_viewerMode == FittingViewerMode.overlay &&
+                  widget.product != null)
                 Positioned(
                   right: 16,
                   bottom: 100,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 4,
+                      horizontal: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                          icon: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           tooltip: 'Agrandar prenda',
                           onPressed: () {
                             setState(() {
@@ -1741,7 +1989,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 22),
+                          icon: const Icon(
+                            Icons.remove_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           tooltip: 'Reducir prenda',
                           onPressed: () {
                             setState(() {
@@ -1751,7 +2003,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 22),
+                          icon: const Icon(
+                            Icons.restart_alt_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           tooltip: 'Centrar prenda',
                           onPressed: () {
                             setState(() {
@@ -1771,20 +2027,33 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                   bottom: 96,
                   left: 20,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.touch_app_rounded, color: Colors.white70, size: 14),
+                        Icon(
+                          Icons.touch_app_rounded,
+                          color: Colors.white70,
+                          size: 14,
+                        ),
                         SizedBox(width: 5),
                         Text(
                           'Arrastra con el dedo para calzar la prenda',
-                          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -1797,11 +2066,16 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                 left: 20,
                 right: 20,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -1812,12 +2086,19 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                           children: [
                             Text(
                               'Talla: ${widget.selectedSize ?? "M"}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                             if (widget.tryOnResult != null)
                               Text(
                                 '${widget.tryOnResult!.confidenceScore.toStringAsFixed(0)}% coincidencia biométrica',
-                                style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
+                                style: const TextStyle(
+                                  color: Colors.greenAccent,
+                                  fontSize: 11,
+                                ),
                               ),
                           ],
                         ),
@@ -1827,12 +2108,28 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
                           widget.onAddToCart();
                           Navigator.pop(context);
                         },
-                        icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 16),
-                        label: const Text('Comprar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        icon: const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        label: const Text(
+                          'Comprar',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.terracotta,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ],
@@ -1869,7 +2166,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
     );
   }
 
-  Widget _buildMainViewerContent(String? garmentImg, bool hasAiResult, bool hasIdmResult) {
+  Widget _buildMainViewerContent(
+    String? garmentImg,
+    bool hasAiResult,
+    bool hasIdmResult,
+  ) {
     switch (_viewerMode) {
       case FittingViewerMode.overlay:
         if (widget.userImageFile != null) {
@@ -1881,7 +2182,11 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
         return Container(
           color: const Color(0xFF141210),
           child: const Center(
-            child: Icon(Icons.accessibility_new_rounded, size: 300, color: Colors.white12),
+            child: Icon(
+              Icons.accessibility_new_rounded,
+              size: 300,
+              color: Colors.white12,
+            ),
           ),
         );
 
@@ -1890,14 +2195,16 @@ class _FullScreenVtonViewerState extends State<FullScreenVtonViewer> {
           return Image.memory(
             widget.idmResultBytes!,
             fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGarmentImage(garmentImg),
           );
         }
         if (widget.tryOnResult != null) {
           return Image.network(
             widget.tryOnResult!.resultImageUrl,
             fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => _buildGarmentImage(garmentImg),
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGarmentImage(garmentImg),
           );
         }
         return _buildGarmentImage(garmentImg);

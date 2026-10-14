@@ -1,5 +1,8 @@
+import '../../widgets/load_error.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/theme.dart';
 import '../../models/reservation.dart';
 import '../../services/reservation_service.dart';
@@ -19,7 +22,9 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ReservationService>().loadReservations();
+      if (!mounted) return;
+      final service = context.read<ReservationService>();
+      if (!service.hasLoaded) service.loadReservations();
     });
   }
 
@@ -29,12 +34,20 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: Text('¿Cancelar reserva ${r.reservationCode}?'),
-        content: const Text('Las prendas quedarán liberadas para otros clientes.'),
+        content: const Text(
+          'Las prendas quedarán liberadas para otros clientes.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Volver'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, Cancelar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Sí, Cancelar',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -50,7 +63,10 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
       } catch (e) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cancelar: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error al cancelar: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -66,11 +82,19 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
         foregroundColor: AppTheme.brown,
         title: const Row(
           children: [
-            Icon(Icons.event_note_rounded, color: AppTheme.terracotta, size: 22),
+            Icon(
+              Icons.event_note_rounded,
+              color: AppTheme.terracotta,
+              size: 22,
+            ),
             SizedBox(width: 8),
             Text(
               'Mis Reservas (CU13)',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.brown),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppTheme.brown,
+              ),
             ),
           ],
         ),
@@ -90,7 +114,11 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                     ),
                   ),
                   backgroundColor: Colors.red,
-                  child: const Icon(Icons.notifications_rounded, color: AppTheme.brown, size: 24),
+                  child: const Icon(
+                    Icons.notifications_rounded,
+                    color: AppTheme.brown,
+                    size: 24,
+                  ),
                 ),
                 tooltip: 'Notificaciones ($unread)',
                 onPressed: () => NotificationsModal.show(context, notifService),
@@ -98,16 +126,29 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppTheme.brownMedium),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: AppTheme.brownMedium,
+            ),
             tooltip: 'Actualizar',
-            onPressed: () => context.read<ReservationService>().loadReservations(),
+            onPressed: () =>
+                context.read<ReservationService>().loadReservations(),
           ),
         ],
       ),
       body: Consumer<ReservationService>(
         builder: (context, resService, _) {
           if (resService.isLoading && resService.reservations.isEmpty) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.terracotta));
+            return const Center(
+              child: CircularProgressIndicator(color: AppTheme.terracotta),
+            );
+          }
+
+          if (resService.errorMessage != null) {
+            return LoadError(
+              message: resService.errorMessage!,
+              onRetry: () => resService.loadReservations(),
+            );
           }
 
           final reservations = resService.reservations;
@@ -118,17 +159,28 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.event_available_rounded, size: 72, color: AppTheme.brownMedium.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.event_available_rounded,
+                      size: 72,
+                      color: AppTheme.brownMedium.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'No tienes reservas activas',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.brown,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       'Puedes apartar prendas desde tu carrito para probártelas en cualquiera de nuestras sucursales físicas.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                      style: TextStyle(
+                        color: AppTheme.brownMedium,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -229,20 +281,37 @@ class _ReservationCard extends StatelessWidget {
                 children: [
                   Text(
                     reservation.reservationCode,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.brown),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppTheme.brown,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: reservation.isPaid ? Colors.green.shade50 : Colors.amber.shade50,
+                      color: reservation.isPaid
+                          ? Colors.green.shade50
+                          : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: reservation.isPaid ? Colors.green.shade300 : Colors.amber.shade300),
+                      border: Border.all(
+                        color: reservation.isPaid
+                            ? Colors.green.shade300
+                            : Colors.amber.shade300,
+                      ),
                     ),
                     child: Text(
-                      reservation.isPaid ? '✓ Pagado (PayPal)' : '⏳ Pago en Tienda',
+                      reservation.isPaid
+                          ? '✓ Pagado (PayPal)'
+                          : '⏳ Pago en Tienda',
                       style: TextStyle(
-                        color: reservation.isPaid ? Colors.green.shade800 : Colors.amber.shade900,
+                        color: reservation.isPaid
+                            ? Colors.green.shade800
+                            : Colors.amber.shade900,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
                       ),
@@ -251,14 +320,21 @@ class _ReservationCard extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   _statusLabel(reservation.status),
-                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -270,19 +346,27 @@ class _ReservationCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: reservation.isPaid ? Colors.green.shade50 : AppTheme.creamLight.withValues(alpha: 0.6),
+              color: reservation.isPaid
+                  ? Colors.green.shade50
+                  : AppTheme.creamLight.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: reservation.isPaid ? Colors.green.shade300 : AppTheme.brownMedium.withValues(alpha: 0.2),
+                color: reservation.isPaid
+                    ? Colors.green.shade300
+                    : AppTheme.brownMedium.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  reservation.isPaid ? Icons.check_circle_rounded : Icons.storefront_rounded,
+                  reservation.isPaid
+                      ? Icons.check_circle_rounded
+                      : Icons.storefront_rounded,
                   size: 18,
-                  color: reservation.isPaid ? Colors.green.shade700 : AppTheme.terracotta,
+                  color: reservation.isPaid
+                      ? Colors.green.shade700
+                      : AppTheme.terracotta,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -292,8 +376,12 @@ class _ReservationCard extends StatelessWidget {
                         : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} para probarse las prendas y pagar en tienda.',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: reservation.isPaid ? FontWeight.bold : FontWeight.w500,
-                      color: reservation.isPaid ? Colors.green.shade900 : AppTheme.brown,
+                      fontWeight: reservation.isPaid
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                      color: reservation.isPaid
+                          ? Colors.green.shade900
+                          : AppTheme.brown,
                     ),
                   ),
                 ),
@@ -305,12 +393,20 @@ class _ReservationCard extends StatelessWidget {
           // Branch & Expiry info
           Row(
             children: [
-              const Icon(Icons.storefront_rounded, size: 16, color: AppTheme.terracotta),
+              const Icon(
+                Icons.storefront_rounded,
+                size: 16,
+                color: AppTheme.terracotta,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   '${reservation.branchName ?? "Sucursal"} · ${reservation.branchAddress ?? ""}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.brown),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppTheme.brown,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -320,11 +416,18 @@ class _ReservationCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.timer_outlined, size: 16, color: AppTheme.brownMedium),
+              const Icon(
+                Icons.timer_outlined,
+                size: 16,
+                color: AppTheme.brownMedium,
+              ),
               const SizedBox(width: 6),
               Text(
                 'Vence: ${_formatDate(reservation.expiresAt)}',
-                style: const TextStyle(color: AppTheme.brownMedium, fontSize: 12),
+                style: const TextStyle(
+                  color: AppTheme.brownMedium,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -335,29 +438,49 @@ class _ReservationCard extends StatelessWidget {
           // Items
           Text(
             'Prendas de la reserva (${reservation.totalItems}):',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.brownMedium),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: AppTheme.brownMedium,
+            ),
           ),
           const SizedBox(height: 6),
-          ...reservation.items.map((it) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    Text('${it.quantity}x ', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.terracotta, fontSize: 13)),
-                    Expanded(
-                      child: Text(
-                        '${it.productName ?? "Prenda"} (${it.sizeName ?? ""}/${it.colorName ?? ""})',
-                        style: const TextStyle(fontSize: 13, color: AppTheme.brown),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+          ...reservation.items.map(
+            (it) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Text(
+                    '${it.quantity}x ',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.terracotta,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${it.productName ?? "Prenda"} (${it.sizeName ?? ""}/${it.colorName ?? ""})',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.brown,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      '\$ ${it.price.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.brownMedium),
+                  ),
+                  Text(
+                    '\$ ${it.price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppTheme.brownMedium,
                     ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
 
           // Total
@@ -366,14 +489,19 @@ class _ReservationCard extends StatelessWidget {
             children: [
               Text(
                 reservation.isPaid ? 'Total Pagado:' : 'Total Estimado:',
-                style: const TextStyle(fontSize: 13, color: AppTheme.brownMedium),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.brownMedium,
+                ),
               ),
               Text(
                 '\$ ${(reservation.totalAmount ?? reservation.totalEstimatedAmount).toStringAsFixed(2)}',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  color: reservation.isPaid ? Colors.green.shade700 : AppTheme.terracotta,
+                  color: reservation.isPaid
+                      ? Colors.green.shade700
+                      : AppTheme.terracotta,
                 ),
               ),
             ],
@@ -385,14 +513,20 @@ class _ReservationCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => PaymentReceiptDialog.show(context, reservation),
+                onPressed: () =>
+                    PaymentReceiptDialog.show(context, reservation),
                 icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                label: const Text('Ver Recibo de Pago (Factura)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                label: const Text(
+                  'Ver Recibo de Pago (Factura)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A365D),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ),
@@ -402,12 +536,21 @@ class _ReservationCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onCancel,
-                icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
-                label: const Text('Cancelar Reserva', style: TextStyle(color: Colors.red, fontSize: 13)),
+                icon: const Icon(
+                  Icons.cancel_outlined,
+                  size: 16,
+                  color: Colors.red,
+                ),
+                label: const Text(
+                  'Cancelar Reserva',
+                  style: TextStyle(color: Colors.red, fontSize: 13),
+                ),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Colors.red.shade200),
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ),
@@ -421,4 +564,3 @@ class _ReservationCard extends StatelessWidget {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
-

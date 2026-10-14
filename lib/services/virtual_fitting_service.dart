@@ -1,9 +1,12 @@
+import 'session_notifier.dart';
+
 import 'package:flutter/foundation.dart';
+
 import '../models/biometric_profile.dart';
 import '../models/virtual_fitting_result.dart';
 import 'api_service.dart';
 
-class VirtualFittingService extends ChangeNotifier {
+class VirtualFittingService extends SessionNotifier {
   final ApiService _apiService;
 
   BiometricProfile? _profile;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/theme.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
@@ -34,7 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
               SizedBox(width: 8),
               Expanded(
-                child: Text('Por favor completa los campos obligatorios marcados en rojo.'),
+                child: Text(
+                  'Por favor completa los campos obligatorios marcados en rojo.',
+                ),
               ),
             ],
           ),
@@ -58,7 +61,11 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(child: Text(authService.errorMessage!)),
             ],
@@ -79,7 +86,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 32.0,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Form(
@@ -141,13 +151,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEF2F2),
-                          border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                          border: Border.all(
+                            color: const Color(0xFFEF4444),
+                            width: 1.5,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 22),
+                            const Icon(
+                              Icons.error_outline_rounded,
+                              color: Color(0xFFDC2626),
+                              size: 22,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
@@ -200,7 +217,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                       ),
-                      validator: (value) => AppValidators.validateRequired(value, 'tu contraseña'),
+                      validator: (value) => AppValidators.validateRequired(
+                        value,
+                        'tu contraseña',
+                      ),
                     ),
                     const SizedBox(height: 28),
 
@@ -221,8 +241,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 24),
 
                     // Register Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      runSpacing: 8,
                       children: [
                         const Text(
                           '¿No tienes una cuenta? ',

@@ -1,9 +1,15 @@
 import 'package:flutter/foundation.dart';
+
 import '../models/user.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
-enum AuthStatus { uninitialized, authenticated, unauthenticated, authenticating }
+enum AuthStatus {
+  uninitialized,
+  authenticated,
+  unauthenticated,
+  authenticating,
+}
 
 class AuthService extends ChangeNotifier {
   final ApiService _apiService;
@@ -43,7 +49,6 @@ class AuthService extends ChangeNotifier {
     }
     notifyListeners();
   }
-
 
   Future<bool> login(String email, String password) async {
     _status = AuthStatus.authenticating;
@@ -103,11 +108,20 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateProfile({String? fullName, String? email}) async {
+  Future<bool> updateProfile({
+    String? fullName,
+    String? email,
+    String? avatarId,
+    String? profilePhoto,
+    bool updateImage = false,
+  }) async {
+    _errorMessage = null;
     try {
       final body = <String, dynamic>{};
-      if (fullName != null) body['full_name'] = fullName;
-      if (email != null) body['email'] = email;
+      if (fullName != null) body['full_name'] = fullName.trim();
+      if (email != null) body['email'] = email.trim();
+      if (avatarId != null) body['avatar_id'] = avatarId;
+      if (updateImage) body['profile_photo'] = profilePhoto;
 
       final response = await _apiService.put('/users/me', body: body);
       _currentUser = User.fromJson(response);

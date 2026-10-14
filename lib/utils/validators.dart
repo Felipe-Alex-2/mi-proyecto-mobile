@@ -20,7 +20,9 @@ class AppValidators {
       return 'Ingresa tu correo electrónico (ej. usuario@correo.com)';
     }
     final trimmed = value.trim();
-    final emailRegex = RegExp(r'^[\w\.-]+@([\w-]+\.)+[\w-]{2,4}$');
+    final emailRegex = RegExp(
+      r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
+    );
     if (!emailRegex.hasMatch(trimmed)) {
       return 'Ingresa un formato de correo válido (ej. usuario@correo.com)';
     }

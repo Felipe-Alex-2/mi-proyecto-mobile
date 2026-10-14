@@ -8,7 +8,9 @@ import 'package:mobile/services/auth_service.dart';
 import 'package:mobile/services/storage_service.dart';
 
 void main() {
-  testWidgets('LoginScreen renders email, password, and login button', (WidgetTester tester) async {
+  testWidgets('LoginScreen renders email, password, and login button', (
+    WidgetTester tester,
+  ) async {
     final storageService = StorageService();
     final apiService = ApiService(storageService);
     final authService = AuthService(apiService, storageService);
@@ -28,9 +30,12 @@ void main() {
     );
 
     // Verify title and input fields
-    expect(find.text('Iniciar Sesión'), findsOneWidget);
+    expect(find.text('Iniciar Sesión'), findsNWidgets(2));
     expect(find.text('Correo Electrónico'), findsOneWidget);
     expect(find.text('Contraseña'), findsOneWidget);
-    expect(find.text('Ingresar'), findsOneWidget);
+    expect(
+      find.widgetWithText(ElevatedButton, 'Iniciar Sesión'),
+      findsOneWidget,
+    );
   });
 }

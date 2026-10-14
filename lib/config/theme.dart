@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ── VESTA Warm Palette (synchronized with Angular web) ──
-  static const terracotta = Color(0xFF8B4513);
-  static const terracottaLight = Color(0xFFC4956A);
-  static const brown = Color(0xFF2C1810);
-  static const brownMedium = Color(0xFF8B7355);
-  static const cream = Color(0xFFF5F0E8);
+  // VESTA editorial palette for the mobile storefront.
+  static const terracotta = Color(0xFFA34F3D);
+  static const terracottaLight = Color(0xFFC5907E);
+  static const brown = Color(0xFF2C211D);
+  static const brownMedium = Color(0xFF756B65);
+  static const cream = Color(0xFFF2EDE6);
   static const creamLight = Color(0xFFFAF7F2);
+  static const sage = Color(0xFFDCE5DB);
+  static const sageInk = Color(0xFF3F5946);
+  static const border = Color(0xFFE9E1D9);
+  static const editorial = TextStyle(
+    fontFamily: 'VestaEditorial',
+    fontSize: 32,
+    height: 1.08,
+    fontWeight: FontWeight.w500,
+    color: brown,
+  );
   static const surface = Color(0xFFFFFFFF);
   static const errorColor = Color(0xFFDC2626);
   static const successColor = Color(0xFF16A34A);
@@ -15,19 +25,27 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: 'VestaBody',
       brightness: Brightness.light,
-      scaffoldBackgroundColor: cream,
+      scaffoldBackgroundColor: creamLight,
       primaryColor: terracotta,
+      textTheme: Typography.material2021().black.apply(
+        fontFamily: 'VestaBody',
+        bodyColor: brown,
+        displayColor: brown,
+      ),
       colorScheme: const ColorScheme.light(
         primary: terracotta,
-        secondary: terracottaLight,
+        secondary: sageInk,
+        secondaryContainer: sage,
+        onSecondaryContainer: sageInk,
         surface: surface,
         error: errorColor,
         onPrimary: Colors.white,
         onSurface: brown,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: surface,
+        backgroundColor: creamLight,
         foregroundColor: brown,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -38,14 +56,16 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: terracotta.withValues(alpha: 0.12)),
+          side: BorderSide(color: border),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: creamLight,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        fillColor: cream,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: terracotta.withValues(alpha: 0.2)),
@@ -76,7 +96,7 @@ class AppTheme {
         prefixIconColor: brownMedium,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: const Color(0xFF991B1B),
+        backgroundColor: brown,
         contentTextStyle: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w600,
@@ -96,24 +116,22 @@ class AppTheme {
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
+            fontFamily: 'VestaBody',
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: terracotta,
-        ),
+        style: TextButton.styleFrom(foregroundColor: terracotta),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: creamLight,
         selectedColor: terracotta,
-        labelStyle: const TextStyle(fontSize: 13),
+        checkmarkColor: Colors.white,
+        labelStyle: const TextStyle(fontFamily: 'VestaBody', fontSize: 13),
         side: BorderSide(color: terracotta.withValues(alpha: 0.2)),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       dividerColor: terracotta.withValues(alpha: 0.1),
       iconTheme: const IconThemeData(color: brownMedium),

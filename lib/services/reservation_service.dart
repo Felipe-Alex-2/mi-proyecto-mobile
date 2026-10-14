@@ -1,31 +1,51 @@
+import 'session_notifier.dart';
+
 import 'package:flutter/foundation.dart';
+
 import '../models/reservation.dart';
 import 'api_service.dart';
 
-class ReservationService extends ChangeNotifier {
+class ReservationService extends SessionNotifier {
   final ApiService _apiService;
   List<Reservation> _reservations = [];
   bool _isLoading = false;
+  String? _errorMessage;
+  Future<List<Reservation>>? _pendingLoad;
+  bool _hasLoaded = false;
+  String? get errorMessage => _errorMessage;
+  bool get hasLoaded => _hasLoaded;
 
   ReservationService(this._apiService);
 
   List<Reservation> get reservations => _reservations;
   bool get isLoading => _isLoading;
 
-  Future<List<Reservation>> loadReservations() async {
+  Future<List<Reservation>> loadReservations() {
+    return _pendingLoad ??= _loadReservations().whenComplete(
+      () => _pendingLoad = null,
+    );
+  }
+
+  Future<List<Reservation>> _loadReservations() async {
+    _errorMessage = null;
     _isLoading = true;
     notifyListeners();
 
     try {
       final data = await _apiService.get('/reservations');
-      _reservations = (data as List<dynamic>?)
-              ?.map((item) => Reservation.fromJson(item as Map<String, dynamic>))
+      _reservations =
+          (data as List<dynamic>?)
+              ?.map(
+                (item) => Reservation.fromJson(item as Map<String, dynamic>),
+              )
               .toList() ??
           [];
+      _hasLoaded = true;
       return _reservations;
     } catch (e) {
       debugPrint('Error loading reservations: $e');
-      rethrow;
+      _errorMessage = e.toString();
+      return _reservations;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -74,7 +94,10 @@ class ReservationService extends ChangeNotifier {
           'customer_notes': customerNotes.trim(),
       };
 
-      final data = await _apiService.post('/reservations/paypal-order', body: body);
+      final data = await _apiService.post(
+        '/reservations/paypal-order',
+        body: body,
+      );
       return Map<String, dynamic>.from(data);
     } finally {
       _isLoading = false;
@@ -87,10 +110,10 @@ class ReservationService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await _apiService.post('/reservations/paypal-capture', body: {
-        'order_id': orderId,
-        'paypal_order_id': orderId,
-      });
+      final data = await _apiService.post(
+        '/reservations/paypal-capture',
+        body: {'order_id': orderId, 'paypal_order_id': orderId},
+      );
       final updated = Reservation.fromJson(data);
       final idx = _reservations.indexWhere((r) => r.id == updated.id);
       if (idx != -1) {
@@ -150,9 +173,13 @@ class ReservationService extends ChangeNotifier {
     return [];
   }
 
-  Future<List<Map<String, dynamic>>> getVariantAvailability(String variantId) async {
+  Future<List<Map<String, dynamic>>> getVariantAvailability(
+    String variantId,
+  ) async {
     try {
-      final data = await _apiService.get('/stocks/variant/$variantId/availability');
+      final data = await _apiService.get(
+        '/stocks/variant/$variantId/availability',
+      );
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('Error loading variant availability: $e');

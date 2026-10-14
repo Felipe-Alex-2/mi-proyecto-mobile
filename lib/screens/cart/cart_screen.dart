@@ -1,8 +1,12 @@
+import '../../widgets/load_error.dart';
+
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../config/theme.dart';
 import '../../models/cart.dart';
 import '../../models/reservation.dart';
@@ -24,7 +28,9 @@ class _CartScreenState extends State<CartScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CartService>().loadCart();
+      if (!mounted) return;
+      final service = context.read<CartService>();
+      if (!service.hasLoaded) service.loadCart();
     });
   }
 
@@ -42,13 +48,16 @@ class _CartScreenState extends State<CartScreen> {
 
     if (branches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay sucursales disponibles en este momento')),
+        const SnackBar(
+          content: Text('No hay sucursales disponibles en este momento'),
+        ),
       );
       return;
     }
 
     String selectedBranchId = branches.first.id;
-    String selectedPaymentMethod = initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
+    String selectedPaymentMethod =
+        initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
     final notesController = TextEditingController();
     bool isSubmitting = false;
     String? sheetError;
@@ -92,7 +101,10 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppTheme.brownMedium),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: AppTheme.brownMedium,
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -100,23 +112,40 @@ class _CartScreenState extends State<CartScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'Prendas: ${cart.totalItems} | Total: \$ ${cart.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      color: AppTheme.brownMedium,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 16),
 
                   // Branch selector
                   const Text(
                     '1. Selecciona la sucursal de retiro *',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.brown,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: selectedBranchId,
                     isExpanded: true,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      prefixIcon: const Icon(Icons.storefront_rounded, color: AppTheme.terracotta, size: 20),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.storefront_rounded,
+                        color: AppTheme.terracotta,
+                        size: 20,
+                      ),
                     ),
                     items: branches.map((b) {
                       return DropdownMenuItem(
@@ -138,7 +167,11 @@ class _CartScreenState extends State<CartScreen> {
                   // Payment method selector
                   const Text(
                     '2. Modalidad de Pago *',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.brown,
+                    ),
                   ),
                   const SizedBox(height: 10),
 
@@ -153,18 +186,26 @@ class _CartScreenState extends State<CartScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isPayPal ? const Color(0xFF0070BA).withValues(alpha: 0.08) : AppTheme.surface,
+                        color: isPayPal
+                            ? const Color(0xFF0070BA).withValues(alpha: 0.08)
+                            : AppTheme.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isPayPal ? const Color(0xFF0070BA) : Colors.grey.shade300,
+                          color: isPayPal
+                              ? const Color(0xFF0070BA)
+                              : Colors.grey.shade300,
                           width: isPayPal ? 2 : 1,
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            isPayPal ? Icons.radio_button_checked : Icons.radio_button_off,
-                            color: isPayPal ? const Color(0xFF0070BA) : Colors.grey.shade400,
+                            isPayPal
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: isPayPal
+                                ? const Color(0xFF0070BA)
+                                : Colors.grey.shade400,
                             size: 22,
                           ),
                           const SizedBox(width: 8),
@@ -174,7 +215,11 @@ class _CartScreenState extends State<CartScreen> {
                               children: const [
                                 Row(
                                   children: [
-                                    Icon(Icons.payment_rounded, color: Color(0xFF0070BA), size: 18),
+                                    Icon(
+                                      Icons.payment_rounded,
+                                      color: Color(0xFF0070BA),
+                                      size: 18,
+                                    ),
                                     SizedBox(width: 6),
                                     Text(
                                       'Pagar por PayPal (Sandbox)',
@@ -189,7 +234,10 @@ class _CartScreenState extends State<CartScreen> {
                                 SizedBox(height: 4),
                                 Text(
                                   'Paga en línea con tu cuenta Sandbox. Tu reserva quedará pagada y lista para recoger en la sucursal.',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.brownMedium,
+                                  ),
                                 ),
                               ],
                             ),
@@ -211,18 +259,26 @@ class _CartScreenState extends State<CartScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: !isPayPal ? AppTheme.terracotta.withValues(alpha: 0.08) : AppTheme.surface,
+                        color: !isPayPal
+                            ? AppTheme.terracotta.withValues(alpha: 0.08)
+                            : AppTheme.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: !isPayPal ? AppTheme.terracotta : Colors.grey.shade300,
+                          color: !isPayPal
+                              ? AppTheme.terracotta
+                              : Colors.grey.shade300,
                           width: !isPayPal ? 2 : 1,
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            !isPayPal ? Icons.radio_button_checked : Icons.radio_button_off,
-                            color: !isPayPal ? AppTheme.terracotta : Colors.grey.shade400,
+                            !isPayPal
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                            color: !isPayPal
+                                ? AppTheme.terracotta
+                                : Colors.grey.shade400,
                             size: 22,
                           ),
                           const SizedBox(width: 8),
@@ -232,7 +288,11 @@ class _CartScreenState extends State<CartScreen> {
                               children: const [
                                 Row(
                                   children: [
-                                    Icon(Icons.storefront_rounded, color: AppTheme.terracotta, size: 18),
+                                    Icon(
+                                      Icons.storefront_rounded,
+                                      color: AppTheme.terracotta,
+                                      size: 18,
+                                    ),
                                     SizedBox(width: 6),
                                     Text(
                                       'Reservar para Probar en Tienda',
@@ -247,7 +307,10 @@ class _CartScreenState extends State<CartScreen> {
                                 SizedBox(height: 4),
                                 Text(
                                   'Reserva gratis por 48h sin pago previo. Te pruebas las prendas en sucursal y abonas en caja.',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.brownMedium),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.brownMedium,
+                                  ),
                                 ),
                               ],
                             ),
@@ -261,15 +324,22 @@ class _CartScreenState extends State<CartScreen> {
                   // Notes
                   const Text(
                     'Comentarios o notas (Opcional)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.brown),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.brown,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: notesController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Ej. Pasaré por la tarde, separar en mostrador...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      hintText:
+                          'Ej. Pasaré por la tarde, separar en mostrador...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
 
@@ -277,7 +347,10 @@ class _CartScreenState extends State<CartScreen> {
                     const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
                         borderRadius: BorderRadius.circular(10),
@@ -286,7 +359,11 @@ class _CartScreenState extends State<CartScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 18),
+                          Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.red.shade700,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -317,30 +394,40 @@ class _CartScreenState extends State<CartScreen> {
                               });
                               try {
                                 final itemsPayload = cart.items
-                                    .map((it) => {
-                                          'variant_id': it.variantId,
-                                          'quantity': it.quantity,
-                                        })
+                                    .map(
+                                      (it) => {
+                                        'variant_id': it.variantId,
+                                        'quantity': it.quantity,
+                                      },
+                                    )
                                     .toList();
 
                                 if (isPayPal) {
                                   // PayPal flow
-                                  final orderData = await resService.createPayPalReservationOrder(
-                                    branchId: selectedBranchId,
-                                    items: itemsPayload,
-                                    customerNotes: notesController.text,
-                                  );
+                                  final orderData = await resService
+                                      .createPayPalReservationOrder(
+                                        branchId: selectedBranchId,
+                                        items: itemsPayload,
+                                        customerNotes: notesController.text,
+                                      );
 
-                                  final approvalUrl = orderData['approval_url'] as String?;
-                                  final orderId = orderData['order_id'] as String?;
+                                  final approvalUrl =
+                                      orderData['approval_url'] as String?;
+                                  final orderId =
+                                      orderData['order_id'] as String?;
 
                                   if (approvalUrl == null || orderId == null) {
-                                    throw Exception('No se pudo generar el enlace de pago de PayPal');
+                                    throw Exception(
+                                      'No se pudo generar el enlace de pago de PayPal',
+                                    );
                                   }
 
                                   // Launch PayPal sandbox checkout in external browser
                                   final uri = Uri.parse(approvalUrl);
-                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  await launchUrl(
+                                    uri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
 
                                   if (!ctx.mounted) return;
                                   Navigator.pop(ctx);
@@ -355,25 +442,30 @@ class _CartScreenState extends State<CartScreen> {
                                   );
                                 } else {
                                   // Free store reservation flow
-                                  final newRes = await resService.createReservation(
-                                    branchId: selectedBranchId,
-                                    items: itemsPayload,
-                                    customerNotes: notesController.text,
-                                  );
+                                  final newRes = await resService
+                                      .createReservation(
+                                        branchId: selectedBranchId,
+                                        items: itemsPayload,
+                                        customerNotes: notesController.text,
+                                      );
 
                                   await cartService.loadCart();
 
                                   if (!ctx.mounted) return;
                                   Navigator.pop(ctx);
 
-                                  _showSuccessDialog(context, newRes, isPaid: false);
+                                  _showSuccessDialog(
+                                    context,
+                                    newRes,
+                                    isPaid: false,
+                                  );
                                 }
                               } catch (e) {
                                 final cleanErr = (e is ApiException)
                                     ? e.message
                                     : '$e'
-                                        .replaceAll('Exception: ', '')
-                                        .replaceAll('ApiException: ', '');
+                                          .replaceAll('Exception: ', '')
+                                          .replaceAll('ApiException: ', '');
                                 setSheetState(() {
                                   isSubmitting = false;
                                   sheetError = cleanErr;
@@ -389,7 +481,9 @@ class _CartScreenState extends State<CartScreen> {
                       icon: isSubmitting
                           ? const SizedBox.shrink()
                           : Icon(
-                              isPayPal ? Icons.payment_rounded : Icons.check_circle_outline,
+                              isPayPal
+                                  ? Icons.payment_rounded
+                                  : Icons.check_circle_outline,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -397,18 +491,29 @@ class _CartScreenState extends State<CartScreen> {
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : Text(
                               isPayPal
                                   ? 'Pagar con PayPal (\$ ${cart.totalAmount.toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                             ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isPayPal ? const Color(0xFF0070BA) : AppTheme.terracotta,
+                        backgroundColor: isPayPal
+                            ? const Color(0xFF0070BA)
+                            : AppTheme.terracotta,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -439,15 +544,25 @@ class _CartScreenState extends State<CartScreen> {
           builder: (dlgCtx, setDlgState) {
             return AlertDialog(
               backgroundColor: AppTheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
               title: Row(
                 children: const [
-                  Icon(Icons.payment_rounded, color: Color(0xFF0070BA), size: 26),
+                  Icon(
+                    Icons.payment_rounded,
+                    color: Color(0xFF0070BA),
+                    size: 26,
+                  ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Pago en PayPal Sandbox',
-                      style: TextStyle(color: AppTheme.brown, fontWeight: FontWeight.bold, fontSize: 17),
+                      style: TextStyle(
+                        color: AppTheme.brown,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
                     ),
                   ),
                 ],
@@ -461,17 +576,26 @@ class _CartScreenState extends State<CartScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF0070BA).withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF0070BA).withValues(alpha: 0.25)),
+                      border: Border.all(
+                        color: const Color(0xFF0070BA).withValues(alpha: 0.25),
+                      ),
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded, color: Color(0xFF0070BA), size: 18),
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: Color(0xFF0070BA),
+                          size: 18,
+                        ),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Se abrió PayPal Sandbox en tu navegador para que apruebes el pago con tu cuenta personal de prueba.',
-                            style: TextStyle(fontSize: 12, color: AppTheme.brown),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.brown,
+                            ),
                           ),
                         ),
                       ],
@@ -493,7 +617,11 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                       child: Text(
                         captureError!,
-                        style: TextStyle(color: Colors.red.shade800, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.red.shade800,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -502,7 +630,10 @@ class _CartScreenState extends State<CartScreen> {
               actions: [
                 TextButton(
                   onPressed: isCapturing ? null : () => Navigator.pop(dlgCtx),
-                  child: const Text('Cancelar', style: TextStyle(color: AppTheme.brownMedium)),
+                  child: const Text(
+                    'Cancelar',
+                    style: TextStyle(color: AppTheme.brownMedium),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: isCapturing
@@ -513,7 +644,8 @@ class _CartScreenState extends State<CartScreen> {
                             captureError = null;
                           });
                           try {
-                            final capturedRes = await resService.capturePayPalReservationOrder(orderId);
+                            final capturedRes = await resService
+                                .capturePayPalReservationOrder(orderId);
                             await cartService.loadCart();
                             if (!dlgCtx.mounted) return;
                             Navigator.pop(dlgCtx);
@@ -523,12 +655,16 @@ class _CartScreenState extends State<CartScreen> {
                               onGoToReservations: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const ReservationsScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const ReservationsScreen(),
+                                  ),
                                 );
                               },
                             );
                           } catch (e) {
-                            final msg = (e is ApiException) ? e.message : '$e'.replaceAll('Exception: ', '');
+                            final msg = (e is ApiException)
+                                ? e.message
+                                : '$e'.replaceAll('Exception: ', '');
                             setDlgState(() {
                               isCapturing = false;
                               captureError = 'Error: $msg';
@@ -538,13 +674,18 @@ class _CartScreenState extends State<CartScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0070BA),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: isCapturing
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text('Confirmar y Capturar Pago'),
                 ),
@@ -556,22 +697,36 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  void _showSuccessDialog(BuildContext context, Reservation r, {bool isPaid = false}) {
+  void _showSuccessDialog(
+    BuildContext context,
+    Reservation r, {
+    bool isPaid = false,
+  }) {
     final paid = isPaid || r.isPaid;
     showDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: AppTheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 28),
+              Icon(
+                Icons.check_circle_rounded,
+                color: Colors.green.shade600,
+                size: 28,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   paid ? '¡Pago y Reserva Confirmados!' : '¡Reserva Creada!',
-                  style: const TextStyle(color: AppTheme.brown, fontWeight: FontWeight.bold, fontSize: 17),
+                  style: const TextStyle(
+                    color: AppTheme.brown,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                  ),
                 ),
               ),
             ],
@@ -582,22 +737,37 @@ class _CartScreenState extends State<CartScreen> {
             children: [
               Text(
                 'Código de Reserva: ${r.reservationCode}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.terracotta),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppTheme.terracotta,
+                ),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: paid ? Colors.green.shade50 : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: paid ? Colors.green.shade300 : Colors.amber.shade300),
+                      border: Border.all(
+                        color: paid
+                            ? Colors.green.shade300
+                            : Colors.amber.shade300,
+                      ),
                     ),
                     child: Text(
-                      paid ? '✓ Pagado (PayPal)' : '⏳ Pendiente (Pago en Tienda)',
+                      paid
+                          ? '✓ Pagado (PayPal)'
+                          : '⏳ Pendiente (Pago en Tienda)',
                       style: TextStyle(
-                        color: paid ? Colors.green.shade800 : Colors.amber.shade900,
+                        color: paid
+                            ? Colors.green.shade800
+                            : Colors.amber.shade900,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -606,23 +776,34 @@ class _CartScreenState extends State<CartScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text('Sucursal: ${r.branchName ?? "Seleccionada"}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                'Sucursal: ${r.branchName ?? "Seleccionada"}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 4),
-              Text('Total: \$ ${(r.totalAmount ?? r.totalEstimatedAmount).toStringAsFixed(2)}'),
+              Text(
+                'Total: \$ ${(r.totalAmount ?? r.totalEstimatedAmount).toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: paid ? Colors.green.shade50 : AppTheme.creamLight.withValues(alpha: 0.5),
+                  color: paid
+                      ? Colors.green.shade50
+                      : AppTheme.creamLight.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: paid ? Colors.green.shade200 : AppTheme.creamLight),
+                  border: Border.all(
+                    color: paid ? Colors.green.shade200 : AppTheme.creamLight,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      paid ? Icons.store_mall_directory_rounded : Icons.info_outline,
+                      paid
+                          ? Icons.store_mall_directory_rounded
+                          : Icons.info_outline,
                       color: paid ? Colors.green.shade700 : AppTheme.terracotta,
                       size: 20,
                     ),
@@ -633,9 +814,13 @@ class _CartScreenState extends State<CartScreen> {
                             ? 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                             : 'Presenta este código en la sucursal ${r.branchName ?? "seleccionada"} para que el personal prepare tus prendas para prueba y pago en caja.',
                         style: TextStyle(
-                          color: paid ? Colors.green.shade900 : AppTheme.brownMedium,
+                          color: paid
+                              ? Colors.green.shade900
+                              : AppTheme.brownMedium,
                           fontSize: 12,
-                          fontWeight: paid ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: paid
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -653,7 +838,13 @@ class _CartScreenState extends State<CartScreen> {
                   MaterialPageRoute(builder: (_) => const ReservationsScreen()),
                 );
               },
-              child: const Text('Ver Mis Reservas', style: TextStyle(color: AppTheme.terracotta, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Ver Mis Reservas',
+                style: TextStyle(
+                  color: AppTheme.terracotta,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -671,11 +862,19 @@ class _CartScreenState extends State<CartScreen> {
         foregroundColor: AppTheme.brown,
         title: const Row(
           children: [
-            Icon(Icons.shopping_bag_outlined, color: AppTheme.terracotta, size: 22),
+            Icon(
+              Icons.shopping_bag_outlined,
+              color: AppTheme.terracotta,
+              size: 22,
+            ),
             SizedBox(width: 8),
             Text(
               'Mi Carrito (CU12)',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.brown),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppTheme.brown,
+              ),
             ),
           ],
         ),
@@ -684,7 +883,10 @@ class _CartScreenState extends State<CartScreen> {
             builder: (_, cartService, _) {
               if (cartService.isEmpty) return const SizedBox.shrink();
               return IconButton(
-                icon: const Icon(Icons.delete_sweep_rounded, color: AppTheme.brownMedium),
+                icon: const Icon(
+                  Icons.delete_sweep_rounded,
+                  color: AppTheme.brownMedium,
+                ),
                 tooltip: 'Vaciar carrito',
                 onPressed: () async {
                   final confirm = await showDialog<bool>(
@@ -692,12 +894,20 @@ class _CartScreenState extends State<CartScreen> {
                     builder: (ctx) => AlertDialog(
                       backgroundColor: AppTheme.surface,
                       title: const Text('¿Vaciar carrito?'),
-                      content: const Text('Se eliminarán todas las prendas añadidas.'),
+                      content: const Text(
+                        'Se eliminarán todas las prendas añadidas.',
+                      ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancelar'),
+                        ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Vaciar', style: TextStyle(color: Colors.red)),
+                          child: const Text(
+                            'Vaciar',
+                            style: TextStyle(color: Colors.red),
+                          ),
                         ),
                       ],
                     ),
@@ -714,7 +924,16 @@ class _CartScreenState extends State<CartScreen> {
       body: Consumer<CartService>(
         builder: (context, cartService, _) {
           if (cartService.isLoading && cartService.cart == null) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.terracotta));
+            return const Center(
+              child: CircularProgressIndicator(color: AppTheme.terracotta),
+            );
+          }
+
+          if (cartService.errorMessage != null) {
+            return LoadError(
+              message: cartService.errorMessage!,
+              onRetry: () => cartService.loadCart(),
+            );
           }
 
           final cart = cartService.cart;
@@ -725,17 +944,28 @@ class _CartScreenState extends State<CartScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 72, color: AppTheme.brownMedium.withValues(alpha: 0.5)),
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 72,
+                      color: AppTheme.brownMedium.withValues(alpha: 0.5),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Tu carrito está vacío',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.brown),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.brown,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
                       'Explora el catálogo y agrega prendas que desees probar o comprar en tienda.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.brownMedium, fontSize: 13),
+                      style: TextStyle(
+                        color: AppTheme.brownMedium,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -754,10 +984,16 @@ class _CartScreenState extends State<CartScreen> {
                     final item = cart.items[index];
                     return _CartItemCard(
                       item: item,
-                      onIncrement: () => cartService.updateQuantity(item.id, item.quantity + 1),
+                      onIncrement: () => cartService.updateQuantity(
+                        item.id,
+                        item.quantity + 1,
+                      ),
                       onDecrement: () {
                         if (item.quantity > 1) {
-                          cartService.updateQuantity(item.id, item.quantity - 1);
+                          cartService.updateQuantity(
+                            item.id,
+                            item.quantity - 1,
+                          );
                         } else {
                           cartService.removeItem(item.id);
                         }
@@ -787,7 +1023,9 @@ class _CartScreenState extends State<CartScreen> {
                       offset: const Offset(0, -4),
                     ),
                   ],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
                 child: SafeArea(
                   child: Column(
@@ -797,11 +1035,19 @@ class _CartScreenState extends State<CartScreen> {
                         children: [
                           const Text(
                             'Total estimado:',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.brownMedium),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.brownMedium,
+                            ),
                           ),
                           Text(
                             '\$ ${cart.totalAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.terracotta),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.terracotta,
+                            ),
                           ),
                         ],
                       ),
@@ -809,17 +1055,26 @@ class _CartScreenState extends State<CartScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _showReservationSheet(context, cart, initialPaymentMethod: 'PAYPAL'),
+                          onPressed: () => _showReservationSheet(
+                            context,
+                            cart,
+                            initialPaymentMethod: 'PAYPAL',
+                          ),
                           icon: const Icon(Icons.payment_rounded, size: 18),
                           label: const Text(
                             'Pagar con PayPal (Sandbox)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0070BA),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -827,16 +1082,33 @@ class _CartScreenState extends State<CartScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => _showReservationSheet(context, cart, initialPaymentMethod: 'EFECTIVO'),
-                          icon: const Icon(Icons.storefront_rounded, size: 18, color: AppTheme.terracotta),
+                          onPressed: () => _showReservationSheet(
+                            context,
+                            cart,
+                            initialPaymentMethod: 'EFECTIVO',
+                          ),
+                          icon: const Icon(
+                            Icons.storefront_rounded,
+                            size: 18,
+                            color: AppTheme.terracotta,
+                          ),
                           label: const Text(
                             'Reservar para Probar en Tienda (Pagar en tienda)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.terracotta),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.terracotta,
+                            ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppTheme.terracotta, width: 1.5),
+                            side: const BorderSide(
+                              color: AppTheme.terracotta,
+                              width: 1.5,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -885,7 +1157,11 @@ class _CartItemCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           item.productName ?? 'Modificar cantidad',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.brown),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.brown,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -905,14 +1181,23 @@ class _CartItemCard extends StatelessWidget {
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(3),
               ],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.brown),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.brown,
+              ),
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 hintText: '1',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppTheme.terracotta, width: 2),
+                  borderSide: const BorderSide(
+                    color: AppTheme.terracotta,
+                    width: 2,
+                  ),
                 ),
               ),
               onSubmitted: (val) {
@@ -927,13 +1212,18 @@ class _CartItemCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: AppTheme.brownMedium)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppTheme.brownMedium),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.terracotta,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               final numVal = int.tryParse(controller.text.trim());
@@ -983,19 +1273,29 @@ class _CartItemCard extends StatelessWidget {
               children: [
                 Text(
                   item.productName ?? 'Prenda',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: AppTheme.brown,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Talla: ${item.sizeName ?? "N/A"} · Color: ${item.colorName ?? "N/A"}',
-                  style: const TextStyle(color: AppTheme.brownMedium, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppTheme.brownMedium,
+                    fontSize: 12,
+                  ),
                 ),
                 if (item.sku != null)
                   Text(
                     'SKU: ${item.sku}',
-                    style: const TextStyle(color: AppTheme.brownMedium, fontSize: 11),
+                    style: const TextStyle(
+                      color: AppTheme.brownMedium,
+                      fontSize: 11,
+                    ),
                   ),
                 const SizedBox(height: 6),
                 if (item.hasDiscount && item.originalPrice != null) ...[
@@ -1013,18 +1313,29 @@ class _CartItemCard extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         '\$ ${item.price.toStringAsFixed(2)} c/u',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC1121F), fontSize: 13),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFC1121F),
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(width: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFE63946),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           '-${item.discountPercent!.toStringAsFixed(0)}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -1032,7 +1343,11 @@ class _CartItemCard extends StatelessWidget {
                 ] else ...[
                   Text(
                     '\$ ${item.price.toStringAsFixed(2)} c/u',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.terracotta, fontSize: 13),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.terracotta,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ],
@@ -1046,7 +1361,11 @@ class _CartItemCard extends StatelessWidget {
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.brownMedium),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: AppTheme.brownMedium,
+                ),
                 onPressed: onRemove,
               ),
               const SizedBox(height: 12),
@@ -1054,17 +1373,23 @@ class _CartItemCard extends StatelessWidget {
                 children: [
                   _QtyButton(icon: Icons.remove, onPressed: onDecrement),
                   InkWell(
-                    onTap: () => _showQuantityDialog(context, item, onQuantityChanged),
+                    onTap: () =>
+                        _showQuantityDialog(context, item, onQuantityChanged),
                     borderRadius: BorderRadius.circular(6),
                     child: Tooltip(
                       message: 'Toca para escribir cantidad',
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.creamLight.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.brownMedium.withValues(alpha: 0.25)),
+                          border: Border.all(
+                            color: AppTheme.brownMedium.withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Text(
                           '${item.quantity}',
@@ -1089,20 +1414,32 @@ class _CartItemCard extends StatelessWidget {
 
   Widget _buildItemImage(String? url) {
     if (url == null || url.isEmpty) {
-      return const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 32);
+      return const Icon(
+        Icons.checkroom_rounded,
+        color: AppTheme.terracotta,
+        size: 32,
+      );
     }
     if (url.startsWith('data:image')) {
       try {
         final bytes = base64Decode(url.split(',').last);
         return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {
-        return const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 32);
+        return const Icon(
+          Icons.checkroom_rounded,
+          color: AppTheme.terracotta,
+          size: 32,
+        );
       }
     }
     return Image.network(
       url,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => const Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 32),
+      errorBuilder: (context, error, stackTrace) => const Icon(
+        Icons.checkroom_rounded,
+        color: AppTheme.terracotta,
+        size: 32,
+      ),
     );
   }
 }
@@ -1130,5 +1467,3 @@ class _QtyButton extends StatelessWidget {
     );
   }
 }
-
-

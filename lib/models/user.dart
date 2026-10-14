@@ -1,4 +1,6 @@
 class User {
+  final String avatarId;
+  final String? profilePhoto;
   final String id;
   final String email;
   final String fullName;
@@ -8,6 +10,8 @@ class User {
   final DateTime updatedAt;
 
   User({
+    this.avatarId = 'terracotta',
+    this.profilePhoto,
     required this.id,
     required this.email,
     required this.fullName,
@@ -19,6 +23,8 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
+      avatarId: json['avatar_id'] as String? ?? 'terracotta',
+      profilePhoto: json['profile_photo'] as String?,
       id: json['id'] as String,
       email: json['email'] as String,
       fullName: json['full_name'] as String,
@@ -32,6 +38,8 @@ class User {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'avatar_id': avatarId,
+      'profile_photo': profilePhoto,
       'email': email,
       'full_name': fullName,
       'is_active': isActive,

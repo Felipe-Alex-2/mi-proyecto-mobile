@@ -1,11 +1,19 @@
-﻿import 'package:flutter/foundation.dart';
+import 'session_notifier.dart';
+
+import 'package:flutter/foundation.dart';
+
 import '../models/cart.dart';
 import 'api_service.dart';
 
-class CartService extends ChangeNotifier {
+class CartService extends SessionNotifier {
   final ApiService _apiService;
   CartResponse? _cart;
   bool _isLoading = false;
+  String? _errorMessage;
+  Future<CartResponse>? _pendingLoad;
+  bool _hasLoaded = false;
+  String? get errorMessage => _errorMessage;
+  bool get hasLoaded => _hasLoaded;
 
   CartService(this._apiService);
 
@@ -15,17 +23,24 @@ class CartService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isEmpty => (_cart?.items.isEmpty ?? true);
 
-  Future<CartResponse> loadCart() async {
+  Future<CartResponse> loadCart() {
+    return _pendingLoad ??= _loadCart().whenComplete(() => _pendingLoad = null);
+  }
+
+  Future<CartResponse> _loadCart() async {
+    _errorMessage = null;
     _isLoading = true;
     notifyListeners();
 
     try {
       final data = await _apiService.get('/cart');
       _cart = CartResponse.fromJson(data);
+      _hasLoaded = true;
       return _cart!;
     } catch (e) {
       debugPrint('Error loading cart: $e');
-      rethrow;
+      _errorMessage = e.toString();
+      return _cart ?? CartResponse(items: [], totalItems: 0, totalAmount: 0);
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../config/theme.dart';
+import '../../widgets/profile_avatar.dart';
+import '../profile/profile_screen.dart';
+import '../../services/catalog_service.dart';
+import '../../widgets/product_photo.dart';
+import '../../widgets/garment_card.dart';
 import '../../services/auth_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/notification_service.dart';
@@ -18,15 +24,46 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  final _visitedTabs = <int>{0};
+  late final NotificationService _notifications;
+
+  void _navigateToTab(int index) => setState(() {
+    _visitedTabs.add(index);
+    _currentIndex = index;
+  });
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _notifications.startPolling();
+      _notifications.loadNotifications(silent: true);
+    } else {
+      _notifications.stopPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notifications.clearSession();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _notifications = context.read<NotificationService>();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<CartService>().loadCart();
-      context.read<NotificationService>().loadNotifications();
+      if (context.read<CatalogService>().status == CatalogStatus.idle) {
+        context.read<CatalogService>().loadProducts();
+      }
+      _notifications.loadNotifications();
+      _notifications.startPolling();
     });
   }
 
@@ -36,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final cartCount = cartService.itemCount;
 
     final pages = [
-      _HomeDashboardTab(onNavigateToTab: (index) => setState(() => _currentIndex = index)),
+      _HomeDashboardTab(onNavigateToTab: _navigateToTab),
       const CatalogScreen(),
       const CartScreen(),
       const ReservationsScreen(),
@@ -45,16 +82,24 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: pages,
+        children: [
+          for (var index = 0; index < pages.length; index++)
+            _visitedTabs.contains(index)
+                ? pages[index]
+                : const SizedBox.shrink(),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: _navigateToTab,
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppTheme.surface,
         selectedItemColor: AppTheme.terracotta,
         unselectedItemColor: AppTheme.brownMedium,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        selectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
         unselectedLabelStyle: const TextStyle(fontSize: 12),
         items: [
           const BottomNavigationBarItem(
@@ -89,314 +134,317 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AssistantCarlitosScreen()),
-          );
-        },
-        backgroundColor: AppTheme.terracotta,
-        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-        label: const Text(
-          'Carlitos IA',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-      ),
     );
   }
 }
 
 class _HomeDashboardTab extends StatelessWidget {
   final ValueChanged<int> onNavigateToTab;
-
   const _HomeDashboardTab({required this.onNavigateToTab});
+
+  void _openFitting(BuildContext context) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const VirtualFittingRoomScreen()),
+  );
+
+  void _showAccount(BuildContext context) {
+    final auth = context.read<AuthService>();
+    final user = auth.currentUser;
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Tu cuenta',
+                style: AppTheme.editorial.copyWith(fontSize: 28),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                user?.fullName ?? 'Cliente',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                user?.email ?? '',
+                style: const TextStyle(color: AppTheme.brownMedium),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                user?.isActive == true
+                    ? 'Cuenta activa · Precios en USD'
+                    : 'Cuenta inactiva · Precios en USD',
+              ),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar perfil y foto'),
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Cerrar sesión'),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: sheetContext,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Cerrar sesión'),
+                      content: const Text('¿Estás seguro de que deseas salir?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('Cancelar'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          child: const Text('Salir'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && sheetContext.mounted) {
+                    Navigator.pop(sheetContext);
+                    auth.logout();
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<AuthService>();
-    final user = authService.currentUser;
-
+    final user = context.watch<AuthService>().currentUser;
+    final catalog = context.watch<CatalogService>();
+    final products = catalog.products.take(4).toList();
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.checkroom_rounded, color: AppTheme.terracotta, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'FashionStore VESTA',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: AppTheme.brown,
-              ),
-            ),
-          ],
+        title: Text(
+          'VESTA',
+          style: AppTheme.editorial.copyWith(fontSize: 26, letterSpacing: 4),
         ),
         actions: [
-          // Globo de Notificaciones con contador en esquina superior derecha
           Consumer<NotificationService>(
-            builder: (context, notifService, _) {
-              final unread = notifService.unreadCount;
-              return IconButton(
-                icon: Badge(
-                  isLabelVisible: unread > 0,
-                  label: Text(
-                    '$unread',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  backgroundColor: Colors.red,
-                  child: const Icon(
-                    Icons.notifications_rounded,
-                    color: AppTheme.brown,
-                    size: 24,
-                  ),
-                ),
-                tooltip: 'Notificaciones ($unread nuevas)',
-                onPressed: () {
-                  NotificationsModal.show(
-                    context,
-                    notifService,
-                    onNavigateToTab: onNavigateToTab,
-                  );
-                },
-              );
-            },
+            builder: (context, notifications, _) => IconButton(
+              tooltip: 'Notificaciones',
+              icon: Badge(
+                isLabelVisible: notifications.unreadCount > 0,
+                label: Text('${notifications.unreadCount}'),
+                backgroundColor: AppTheme.terracotta,
+                child: const Icon(Icons.notifications_none_rounded),
+              ),
+              onPressed: () => NotificationsModal.show(
+                context,
+                notifications,
+                onNavigateToTab: onNavigateToTab,
+              ),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: AppTheme.errorColor),
-            tooltip: 'Cerrar sesión',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  backgroundColor: AppTheme.surface,
-                  title: const Text('Cerrar Sesión', style: TextStyle(color: AppTheme.brown)),
-                  content: const Text('¿Estás seguro de que deseas salir?', style: TextStyle(color: AppTheme.brownMedium)),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        authService.logout();
-                      },
-                      child: const Text('Cerrar Sesión'),
+            tooltip: 'Tu cuenta',
+            onPressed: () => _showAccount(context),
+            icon: ProfileAvatar(user: user, size: 34),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: catalog.loadProducts,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          children: [
+            Text(
+              'Hola, ${user?.fullName.split(' ').first ?? "Cliente"}',
+              style: const TextStyle(fontSize: 14, color: AppTheme.brownMedium),
+            ),
+            const SizedBox(height: 8),
+            const Text('Encuentra tu\npróximo look', style: AppTheme.editorial),
+            const SizedBox(height: 24),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 300,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ProductPhoto(
+                      url: products.isEmpty ? null : products.first.imageUrl,
+                    ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0xCC2C211D)],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 22,
+                      right: 22,
+                      bottom: 22,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tu estilo, en ti.',
+                            style: AppTheme.editorial.copyWith(
+                              color: Colors.white,
+                              fontSize: 32,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Descubre cómo te queda antes de reservar.',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                          const SizedBox(height: 18),
+                          ElevatedButton(
+                            onPressed: () => _openFitting(context),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(child: Text('Abrir vestidor')),
+                                SizedBox(width: 12),
+                                Icon(Icons.arrow_forward_rounded, size: 18),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Banner
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppTheme.brown, AppTheme.terracotta],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.brown.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Para ti',
+                  style: AppTheme.editorial.copyWith(fontSize: 26),
+                ),
+                TextButton(
+                  onPressed: () => onNavigateToTab(1),
+                  child: const Text('Ver catálogo'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (catalog.status == CatalogStatus.loading && products.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (products.isNotEmpty)
+              LayoutBuilder(
+                builder: (context, constraints) => GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: constraints.maxWidth > 600 ? 4 : 2,
+                    mainAxisExtent:
+                        290 +
+                        (MediaQuery.textScalerOf(context).scale(14) - 14) * 4,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: products.length,
+                  itemBuilder: (_, index) =>
+                      GarmentCard(product: products[index]),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      catalog.status == CatalogStatus.error
+                          ? 'No pudimos cargar las prendas.'
+                          : 'Pronto encontrarás nuevas prendas aquí.',
+                      textAlign: TextAlign.center,
+                    ),
+                    TextButton(
+                      onPressed: catalog.loadProducts,
+                      child: const Text('Actualizar catálogo'),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 20),
+            Material(
+              color: AppTheme.sage,
+              borderRadius: BorderRadius.circular(16),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AssistantCarlitosScreen(),
+                  ),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      Icon(
+                        Icons.auto_awesome_outlined,
+                        color: AppTheme.sageInk,
+                        size: 28,
+                      ),
+                      SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.check_circle_outline, color: Colors.white.withValues(alpha: 0.9), size: 14),
-                            const SizedBox(width: 6),
                             Text(
-                              'Sesión Activa',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.bold),
+                              'Carlitos IA',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Descubre prendas para ti',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.sageInk,
+                              ),
                             ),
                           ],
                         ),
                       ),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: AppTheme.sageInk,
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '¡Hola, ${user?.fullName ?? "Cliente"}!',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Explora nuestro catálogo en Dólares (\$ USD), arma tu carrito y reserva tus prendas favoritas para probártelas en tienda física.',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Quick access cards
-            _QuickAccessCard(
-              icon: Icons.auto_awesome,
-              iconColor: AppTheme.terracotta,
-              iconBg: AppTheme.terracotta.withValues(alpha: 0.1),
-              title: 'Asistente y Recomendador IA',
-              subtitle: 'Carlitos te recomienda prendas según tus gustos',
-              label: 'Consultar',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AssistantCarlitosScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            _QuickAccessCard(
-              icon: Icons.face_retouching_natural_rounded,
-              iconColor: Colors.purple,
-              iconBg: Colors.purple.withValues(alpha: 0.1),
-              title: 'Probador Virtual',
-              subtitle: 'Prueba la ropa en ti usando IA',
-              label: 'Probar',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const VirtualFittingRoomScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Profile Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.badge_outlined, color: AppTheme.terracotta),
-                        SizedBox(width: 8),
-                        Text(
-                          'Tu Cuenta',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.brown),
-                        ),
-                      ],
-                    ),
-                    Divider(height: 24, color: AppTheme.terracotta.withValues(alpha: 0.12)),
-                    _buildInfoRow('Nombre', user?.fullName ?? '-'),
-                    const SizedBox(height: 12),
-                    _buildInfoRow('Email', user?.email ?? '-'),
-                    const SizedBox(height: 12),
-                    _buildInfoRow('Moneda del Sistema', 'Dólares (\$ USD)'),
-                    const SizedBox(height: 12),
-                    _buildInfoRow('Estado', user?.isActive == true ? 'Activo ✅' : 'Inactivo'),
-                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: AppTheme.brownMedium, fontSize: 13)),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.brown)),
-      ],
-    );
-  }
-}
-
-class _QuickAccessCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String title;
-  final String subtitle;
-  final String label;
-  final VoidCallback onTap;
-
-  const _QuickAccessCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.title,
-    required this.subtitle,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.terracotta.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brown)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: AppTheme.brownMedium, fontSize: 12)),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: iconColor.withValues(alpha: 0.3)),
-              ),
-              child: Text(label, style: TextStyle(color: iconColor, fontSize: 12, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
