@@ -112,7 +112,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (saved) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Perfil actualizado.'),
+          content: Text(
+            'Cambios guardados. Si no hay conexión, quedarán pendientes de sincronizar.',
+          ),
           backgroundColor: AppTheme.sageInk,
         ),
       );
@@ -254,6 +256,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: _saving || _picking ? null : _save,
             child: Text(_saving ? 'Guardando…' : 'Guardar cambios'),
           ),
+          if (context.watch<AuthService>().biometrics != null)
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.fingerprint),
+              title: const Text('Desbloqueo con huella / biometría'),
+              subtitle: const Text(
+                'Usa la biometría registrada en este dispositivo. Tu contraseña no se guarda.',
+              ),
+              value: context.watch<AuthService>().biometricEnabled,
+              onChanged: (enabled) async {
+                final auth = context.read<AuthService>();
+                final ok = await auth.setBiometric(enabled);
+                if (!context.mounted) return;
+                if (!ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'No se pudo activar. Registra una huella en los ajustes del dispositivo o vuelve a intentarlo.',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
           const SizedBox(height: 24),
         ],
       ),

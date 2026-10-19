@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../config/api_config.dart';
 import 'storage_service.dart';
+import 'offline_service.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -18,6 +19,96 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+  OfflineService? offline;
+  Future<dynamic> get(String endpoint, {bool includeAuth = true}) =>
+      offline?.owner != null && includeAuth
+      ? offline!.read(
+          endpoint,
+          () => sendOnline('GET', endpoint, {}, includeAuth: includeAuth),
+        )
+      : getOnline(endpoint, includeAuth: includeAuth);
+  Future<dynamic> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool includeAuth = true,
+  }) => _write('POST', endpoint, body, includeAuth);
+  Future<dynamic> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool includeAuth = true,
+  }) => _write('PUT', endpoint, body, includeAuth);
+  Future<dynamic> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool includeAuth = true,
+  }) => _write('PATCH', endpoint, body, includeAuth);
+  Future<dynamic> delete(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool includeAuth = true,
+  }) => _write('DELETE', endpoint, body, includeAuth);
+  Future<dynamic> _write(
+    String method,
+    String path,
+    Map<String, dynamic>? body,
+    bool includeAuth,
+  ) {
+    if (includeAuth &&
+        offline?.owner != null &&
+        method == 'POST' &&
+        path == '/virtual-fitting/recommend-size') {
+      return offline!.read(
+        'request:$path:${jsonEncode(body)}',
+        () => postOnline(path, body: body),
+      );
+    }
+    if (includeAuth &&
+        offline?.owner != null &&
+        OfflineService.supports(method, path)) {
+      return offline!.mutate(method, path, body ?? {});
+    }
+    return sendOnline(method, path, body ?? {}, includeAuth: includeAuth);
+  }
+
+  Future<dynamic> sendOnline(
+    String method,
+    String path,
+    Map<String, dynamic> body, {
+    bool includeAuth = true,
+  }) async {
+    try {
+      return await switch (method) {
+        'GET' => getOnline(path, includeAuth: includeAuth),
+        'POST' => postOnline(path, body: body, includeAuth: includeAuth),
+        'PUT' => putOnline(path, body: body, includeAuth: includeAuth),
+        'PATCH' => patchOnline(path, body: body, includeAuth: includeAuth),
+        'DELETE' => deleteOnline(path, body: body, includeAuth: includeAuth),
+        _ => throw ApiException('Método no permitido', statusCode: 422),
+      };
+    } on ApiException catch (e) {
+      if (e.statusCode != 401 || !includeAuth) rethrow;
+      final refresh = await _storageService.getRefreshToken();
+      if (refresh == null) rethrow;
+      final tokens = await postOnline(
+        '/auth/refresh',
+        body: {'refresh_token': refresh},
+        includeAuth: false,
+      );
+      await _storageService.saveTokens(
+        accessToken: tokens['access_token'],
+        refreshToken: tokens['refresh_token'],
+      );
+      return switch (method) {
+        'GET' => getOnline(path),
+        'POST' => postOnline(path, body: body),
+        'PUT' => putOnline(path, body: body),
+        'PATCH' => patchOnline(path, body: body),
+        'DELETE' => deleteOnline(path, body: body),
+        _ => throw ApiException('Método no permitido', statusCode: 422),
+      };
+    }
+  }
+
   final StorageService _storageService;
 
   final http.Client _client;
@@ -49,7 +140,7 @@ class ApiService {
     return headers;
   }
 
-  Future<dynamic> get(String endpoint, {bool includeAuth = true}) async {
+  Future<dynamic> getOnline(String endpoint, {bool includeAuth = true}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final headers = await _getHeaders(includeAuth: includeAuth);
 
@@ -67,11 +158,12 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }
 
-  Future<dynamic> post(
+  Future<dynamic> postOnline(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
@@ -97,11 +189,12 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }
 
-  Future<dynamic> put(
+  Future<dynamic> putOnline(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
@@ -127,11 +220,12 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }
 
-  Future<dynamic> patch(
+  Future<dynamic> patchOnline(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
@@ -157,11 +251,12 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }
 
-  Future<dynamic> delete(
+  Future<dynamic> deleteOnline(
     String endpoint, {
     Map<String, dynamic>? body,
     bool includeAuth = true,
@@ -187,6 +282,7 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }
@@ -202,6 +298,12 @@ class ApiService {
     Map<String, String>? formFields,
     bool includeAuth = true,
   }) async {
+    if (offline?.offline ?? false) {
+      throw ApiException(
+        'El probador con IA requiere conexión. Tus resultados anteriores siguen disponibles en caché.',
+        statusCode: 0,
+      );
+    }
     final url = Uri.parse('${ApiConfig.baseUrl}$endpoint');
     final request = http.MultipartRequest('POST', url);
 
@@ -250,6 +352,7 @@ class ApiService {
       if (e is ApiException) rethrow;
       throw ApiException(
         'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+        statusCode: 0,
       );
     }
   }

@@ -15,7 +15,22 @@ class CartService extends SessionNotifier {
   String? get errorMessage => _errorMessage;
   bool get hasLoaded => _hasLoaded;
 
-  CartService(this._apiService);
+  CartService(this._apiService) {
+    _apiService.offline?.addListener(_syncChanged);
+  }
+  int _revision = -1;
+  void _syncChanged() {
+    final sync = _apiService.offline!;
+    if (_revision == sync.revision) return;
+    _revision = sync.revision;
+    if (_hasLoaded && !sync.syncing) loadCart();
+  }
+
+  @override
+  void dispose() {
+    _apiService.offline?.removeListener(_syncChanged);
+    super.dispose();
+  }
 
   CartResponse? get cart => _cart;
   int get itemCount => _cart?.totalItems ?? 0;

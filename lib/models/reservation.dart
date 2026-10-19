@@ -119,7 +119,8 @@ class Reservation {
     );
   }
 
-  bool get isPending => status == 'PENDING';
+  bool get isPending => status == 'PENDING' || status == 'SYNC_PENDING';
+  bool get isLocal => id.startsWith('local:');
   bool get isConfirmed => status == 'CONFIRMED';
   bool get isCompleted => status == 'COMPLETED';
   bool get isCancelled => status == 'CANCELLED';

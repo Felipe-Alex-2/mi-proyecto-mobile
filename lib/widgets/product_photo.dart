@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../config/theme.dart';
 
@@ -17,9 +18,21 @@ class ProductPhoto extends StatefulWidget {
 
 class _ProductPhotoState extends State<ProductPhoto> {
   Uint8List? _bytes;
+  Future<Uint8List>? _network;
+  Future<Uint8List> _cachedPhoto(String url) async {
+    final manager = DefaultCacheManager();
+    final cached = await manager.getFileFromCache(url);
+    if (cached != null && await cached.file.exists()) {
+      return cached.file.readAsBytes();
+    }
+    return (await manager.getSingleFile(url)).readAsBytes();
+  }
 
   void _decodeDataUrl() {
     _bytes = null;
+    _network = widget.url?.startsWith('http') ?? false
+        ? _cachedPhoto(widget.url!)
+        : null;
     if (widget.url?.startsWith('data:image') ?? false) {
       try {
         _bytes = base64Decode(widget.url!.split(',').last);
@@ -71,13 +84,17 @@ class _ProductPhotoState extends State<ProductPhoto> {
             errorBuilder: (_, _, _) => fallback(),
           );
         }
-        return Image.network(
-          url,
-          fit: widget.fit,
-          cacheWidth: cacheWidth,
-          errorBuilder: (_, _, _) => fallback(),
-          loadingBuilder: (_, child, progress) =>
-              progress == null ? child : fallback(),
+        return FutureBuilder<Uint8List>(
+          future: _network,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return fallback();
+            return Image.memory(
+              snapshot.data!,
+              fit: widget.fit,
+              cacheWidth: cacheWidth,
+              errorBuilder: (_, _, _) => fallback(),
+            );
+          },
         );
       },
     );

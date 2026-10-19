@@ -15,7 +15,22 @@ class ReservationService extends SessionNotifier {
   String? get errorMessage => _errorMessage;
   bool get hasLoaded => _hasLoaded;
 
-  ReservationService(this._apiService);
+  ReservationService(this._apiService) {
+    _apiService.offline?.addListener(_syncChanged);
+  }
+  int _revision = -1;
+  void _syncChanged() {
+    final sync = _apiService.offline!;
+    if (_revision == sync.revision) return;
+    _revision = sync.revision;
+    if (_hasLoaded && !sync.syncing) loadReservations();
+  }
+
+  @override
+  void dispose() {
+    _apiService.offline?.removeListener(_syncChanged);
+    super.dispose();
+  }
 
   List<Reservation> get reservations => _reservations;
   bool get isLoading => _isLoading;
@@ -94,11 +109,16 @@ class ReservationService extends SessionNotifier {
           'customer_notes': customerNotes.trim(),
       };
 
-      final data = await _apiService.post(
-        '/reservations/paypal-order',
-        body: body,
+      final reservation = await _apiService.post(
+        '/reservations',
+        body: {...body, 'payment_method': 'PAYPAL'},
       );
-      return Map<String, dynamic>.from(data);
+      if ((reservation['id'] as String).startsWith('local:')) {
+        return {'pending_sync': true, 'reservation': reservation};
+      }
+      return await _apiService.post(
+        '/reservations/${reservation['id']}/paypal-order',
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -114,7 +134,7 @@ class ReservationService extends SessionNotifier {
         '/reservations/paypal-capture',
         body: {'order_id': orderId, 'paypal_order_id': orderId},
       );
-      final updated = Reservation.fromJson(data);
+      final updated = Reservation.fromJson(data['reservation'] ?? data);
       final idx = _reservations.indexWhere((r) => r.id == updated.id);
       if (idx != -1) {
         _reservations[idx] = updated;
@@ -131,7 +151,7 @@ class ReservationService extends SessionNotifier {
   Future<Reservation> cancelReservation(String id) async {
     try {
       final data = await _apiService.delete('/reservations/$id');
-      final updated = Reservation.fromJson(data);
+      final updated = Reservation.fromJson(data['reservation'] ?? data);
       final idx = _reservations.indexWhere((r) => r.id == id);
       if (idx != -1) {
         _reservations[idx] = updated;

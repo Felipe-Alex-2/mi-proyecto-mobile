@@ -1,3 +1,6 @@
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../services/api_service.dart';
 import '../../widgets/load_error.dart';
 
 import 'package:flutter/material.dart';
@@ -235,6 +238,12 @@ class _ReservationCard extends StatelessWidget {
 
   String _statusLabel(String status) {
     switch (status) {
+      case 'SYNC_PENDING':
+        return 'Pendiente de envío';
+      case 'SYNC_FAILED':
+        return 'Revisar sincronización';
+      case 'CANCEL_PENDING':
+        return 'Cancelación pendiente';
       case 'PENDING':
         return 'Pendiente';
       case 'CONFIRMED':
@@ -307,6 +316,8 @@ class _ReservationCard extends StatelessWidget {
                     child: Text(
                       reservation.isPaid
                           ? '✓ Pagado (PayPal)'
+                          : reservation.isPaypal
+                          ? '⏳ PayPal pendiente'
                           : '⏳ Pago en Tienda',
                       style: TextStyle(
                         color: reservation.isPaid
@@ -371,7 +382,9 @@ class _ReservationCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    reservation.isPaid
+                    reservation.isLocal
+                        ? 'Guardada en el dispositivo. Espera la confirmación de disponibilidad antes de acudir a la sucursal.'
+                        : reservation.isPaid
                         ? 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                         : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} para probarse las prendas y pagar en tienda.',
                     style: TextStyle(
@@ -423,7 +436,9 @@ class _ReservationCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'Vence: ${_formatDate(reservation.expiresAt)}',
+                reservation.isLocal
+                    ? 'Disponibilidad por confirmar'
+                    : 'Vence: ${_formatDate(reservation.expiresAt)}',
                 style: const TextStyle(
                   color: AppTheme.brownMedium,
                   fontSize: 12,
@@ -531,6 +546,54 @@ class _ReservationCard extends StatelessWidget {
               ),
             ),
           ] else if (reservation.isPending || reservation.isConfirmed) ...[
+            if (reservation.isPaypal &&
+                !reservation.isPaid &&
+                !reservation.isLocal)
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.payment),
+                    label: const Text('Autorizar PayPal'),
+                    onPressed: () async {
+                      try {
+                        final result = await context.read<ApiService>().post(
+                          '/reservations/${reservation.id}/paypal-order',
+                        );
+                        await launchUrl(
+                          Uri.parse(result['approval_url']),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text('$e')));
+                        }
+                      }
+                    },
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        final api = context.read<ReservationService>();
+                        final order = reservation.paypalOrderId;
+                        if (order == null) {
+                          await api.loadReservations();
+                          return;
+                        }
+                        await api.capturePayPalReservationOrder(order);
+                        await api.loadReservations();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text('$e')));
+                        }
+                      }
+                    },
+                    child: const Text('Verificar pago'),
+                  ),
+                ],
+              ),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,

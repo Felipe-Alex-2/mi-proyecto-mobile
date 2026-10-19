@@ -5,16 +5,25 @@ class StorageService {
   final FlutterSecureStorage _storage;
 
   StorageService({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(
-                encryptedSharedPreferences: true,
-                resetOnError: true,
-              ),
-            );
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            aOptions: AndroidOptions(
+              encryptedSharedPreferences: true,
+              resetOnError: true,
+            ),
+          );
 
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
+
+  Future<void> saveSyncOwner(String owner) =>
+      _storage.write(key: 'sync_owner', value: owner);
+  Future<String?> getSyncOwner() => _storage.read(key: 'sync_owner');
+  Future<void> clearSyncOwner() => _storage.delete(key: 'sync_owner');
+  Future<void> saveLocalUser(String user) =>
+      _storage.write(key: 'local_user', value: user);
+  Future<String?> getLocalUser() => _storage.read(key: 'local_user');
 
   Future<void> saveTokens({
     required String accessToken,
@@ -25,6 +34,7 @@ class StorageService {
       await _storage.write(key: _refreshTokenKey, value: refreshToken);
     } catch (e) {
       debugPrint('Error saving tokens: $e');
+      rethrow;
     }
   }
 
@@ -65,4 +75,3 @@ class StorageService {
     }
   }
 }
-

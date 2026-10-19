@@ -649,6 +649,16 @@ class _CartScreenState extends State<CartScreen> {
                             await cartService.loadCart();
                             if (!dlgCtx.mounted) return;
                             Navigator.pop(dlgCtx);
+                            if (!capturedRes.isPaid) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Verificación de pago pendiente. Se enviará al recuperar la conexión; aún no se ha confirmado el cobro.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
                             PaymentReceiptDialog.show(
                               context,
                               capturedRes,
