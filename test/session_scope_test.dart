@@ -3,16 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile/main.dart';
-import 'package:mobile/models/user.dart';
-import 'package:mobile/screens/home/home_screen.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/auth_service.dart';
-import 'package:mobile/services/cart_service.dart';
-import 'package:mobile/services/catalog_service.dart';
-import 'package:mobile/services/notification_service.dart';
-import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/modelos/usuario.dart';
+import 'package:mobile/pantallas/inicio/inicio_screen.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/autenticacion_service.dart';
+import 'package:mobile/servicios/carrito_service.dart';
+import 'package:mobile/servicios/catalogo_service.dart';
+import 'package:mobile/servicios/notificacion_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
 
-class _Storage extends StorageService {
+class _Storage extends AlmacenamientoService {
   @override
   Future<bool> hasToken() async => false;
 }
@@ -32,14 +32,16 @@ class _Api extends ApiService {
   }) async => <String, dynamic>{};
 }
 
-class _Auth extends AuthService {
+class _Auth extends AutenticacionService {
   _Auth(super.api, super.storage);
   String userId = 'first';
   @override
   AuthStatus get status => AuthStatus.authenticated;
   @override
-  User get currentUser => User.fromJson({
+  Usuario get currentUser => Usuario.fromJson({
     'id': userId,
+    'branch_id': 'branch',
+    'selected_tenant_id': 'company',
     'email': '$userId@example.com',
     'full_name': 'Cliente',
     'created_at': '2026-10-13T12:00:00Z',
@@ -74,26 +76,26 @@ void main() {
         MultiProvider(
           providers: [
             Provider<ApiService>.value(value: api),
-            ChangeNotifierProvider<AuthService>.value(value: auth),
-            ChangeNotifierProvider(create: (_) => CatalogService(api)),
+            ChangeNotifierProvider<AutenticacionService>.value(value: auth),
+            ChangeNotifierProvider(create: (_) => CatalogoService(api)),
           ],
-          child: const MyApp(),
+          child: const VestaApp(),
         ),
       );
       await tester.pumpAndSettle();
-      final home = tester.element(find.byType(HomeScreen));
-      final oldCart = home.read<CartService>();
-      final oldNotifications = home.read<NotificationService>();
+      final home = tester.element(find.byType(InicioScreen));
+      final oldCart = home.read<CarritoService>();
+      final oldNotifications = home.read<NotificacionService>();
       // A pushed route must retain access to the authenticated session scope.
       await tester.tap(find.text('Abrir vestidor'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       auth.changeUser();
       await tester.pumpAndSettle();
-      final newHome = tester.element(find.byType(HomeScreen));
-      expect(identical(oldCart, newHome.read<CartService>()), isFalse);
+      final newHome = tester.element(find.byType(InicioScreen));
+      expect(identical(oldCart, newHome.read<CarritoService>()), isFalse);
       expect(
-        identical(oldNotifications, newHome.read<NotificationService>()),
+        identical(oldNotifications, newHome.read<NotificacionService>()),
         isFalse,
       );
       expect(find.text('Vestidor virtual'), findsNothing);

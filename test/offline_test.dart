@@ -2,27 +2,29 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile/widgets/offline_status.dart';
+import 'package:mobile/widgets/estado_sin_conexion.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:mobile/services/offline_store.dart';
-import 'package:mobile/services/offline_service.dart';
-import 'package:mobile/services/api_service.dart';
+import 'package:mobile/servicios/almacen_sin_conexion.dart';
+import 'package:mobile/servicios/sin_conexion_service.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/modelos/carrito.dart';
+import 'package:mobile/modelos/perfil_biometrico.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
-  late OfflineStore store;
-  late OfflineService offline;
+  late AlmacenSinConexion store;
+  late SinConexionService offline;
   final sent = <Map<String, dynamic>>[];
   setUp(() async {
     sent.clear();
-    store = await OfflineStore.open(
+    store = await AlmacenSinConexion.open(
       factory: databaseFactoryFfi,
       path: inMemoryDatabasePath,
     );
-    offline = OfflineService(store, (method, path, body) async {
+    offline = SinConexionService(store, (method, path, body) async {
       if (method == 'GET') return {'id': 'u1'};
       sent.add(body);
       if (body['path'] == '/reservations') {
@@ -64,7 +66,7 @@ void main() {
           child: MaterialApp(
             navigatorKey: navigation,
             builder: (context, child) =>
-                OfflineStatus(navigatorKey: navigation, child: child!),
+                EstadoSinConexion(navigatorKey: navigation, child: child!),
             home: const Scaffold(body: Text('VESTA')),
           ),
         ),
@@ -95,6 +97,7 @@ void main() {
     await offline.mutate('PUT', '/users/me', {'full_name': 'Editado offline'});
     expect(offline.pendingCount, 1);
     final result = await offline.read('/users/me', () async => null);
+    expect(result, isA<Map<String, dynamic>>());
     expect(result['full_name'], 'Editado offline');
     await offline.activate('api|u2');
     expect(offline.pendingCount, 0);
@@ -118,7 +121,7 @@ void main() {
     'stock conflict blocks FIFO and is visible, never silently dropped',
     () async {
       offline.dispose();
-      offline = OfflineService(
+      offline = SinConexionService(
         store,
         (_, _, _) async => throw ApiException('Sin stock', statusCode: 409),
       );
@@ -145,7 +148,7 @@ void main() {
     String? first;
     var attempt = 0;
     offline.dispose();
-    offline = OfflineService(store, (_, _, body) async {
+    offline = SinConexionService(store, (_, _, body) async {
       if (attempt++ == 0) {
         first = body['operation_id'];
         throw ApiException('timeout', statusCode: 408);
@@ -162,7 +165,7 @@ void main() {
   });
   test('expired session retains outbox and asks to login', () async {
     offline.dispose();
-    offline = OfflineService(
+    offline = SinConexionService(
       store,
       (_, _, _) async => throw ApiException('expired', statusCode: 401),
     );
@@ -194,6 +197,7 @@ void main() {
     expect(edited['total_items'], 2);
     final removed = await offline.mutate('DELETE', '/cart/items/$id', {});
     expect(removed['items'], isEmpty);
+    expect(CarritoResponse.fromJson(removed).syncPending, isTrue);
     expect(offline.pendingCount, 3);
   });
 
@@ -209,6 +213,8 @@ void main() {
         'hip_cm': 95,
       });
       expect(result['height_cm'], 180);
+      expect(PerfilBiometrico.fromJson(result).syncPending, isTrue);
+      expect(result, isA<Map<String, dynamic>>());
       final loaded = await offline.read(
         '/virtual-fitting/profile',
         () async => throw StateError('network'),
@@ -218,6 +224,10 @@ void main() {
         {'id': 'n1', 'is_read': false},
       ]);
       await offline.mutate('PATCH', '/notifications/n1/read', {});
+      expect(
+        (await offline.cached('/notifications'))[0],
+        isA<Map<String, dynamic>>(),
+      );
       expect((await offline.cached('/notifications'))[0]['is_read'], isTrue);
     },
   );
@@ -249,7 +259,7 @@ void main() {
   test('queue survives closing and reopening SQLite', () async {
     final folder = await Directory.systemTemp.createTemp('vesta-offline-test-');
     final path = '${folder.path}/test.db';
-    final durable = await OfflineStore.open(
+    final durable = await AlmacenSinConexion.open(
       factory: databaseFactoryFfi,
       path: path,
     );
@@ -262,7 +272,7 @@ void main() {
       'created_at': '2026-10-19',
     });
     await durable.db.close();
-    final reopened = await OfflineStore.open(
+    final reopened = await AlmacenSinConexion.open(
       factory: databaseFactoryFfi,
       path: path,
     );

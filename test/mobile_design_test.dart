@@ -6,18 +6,18 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile/config/theme.dart';
-import 'package:mobile/screens/home/home_screen.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/auth_service.dart';
-import 'package:mobile/services/cart_service.dart';
-import 'package:mobile/services/catalog_service.dart';
-import 'package:mobile/services/notification_service.dart';
-import 'package:mobile/services/reservation_service.dart';
-import 'package:mobile/services/storage_service.dart';
-import 'package:mobile/services/virtual_fitting_service.dart';
+import 'package:mobile/configuracion/tema.dart';
+import 'package:mobile/pantallas/inicio/inicio_screen.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/autenticacion_service.dart';
+import 'package:mobile/servicios/carrito_service.dart';
+import 'package:mobile/servicios/catalogo_service.dart';
+import 'package:mobile/servicios/notificacion_service.dart';
+import 'package:mobile/servicios/reserva_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
+import 'package:mobile/servicios/vestidor_virtual_service.dart';
 
-class _Storage extends StorageService {
+class _Storage extends AlmacenamientoService {
   @override
   Future<bool> hasToken() async => false;
 }
@@ -82,7 +82,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final storage = _Storage();
     final api = _Api(storage);
-    final notifications = NotificationService(api)..stopPolling();
+    final notifications = NotificacionService(api)..stopPolling();
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
       notifications.dispose();
@@ -90,22 +90,29 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AuthService(api, storage)),
-          ChangeNotifierProvider(create: (_) => CatalogService(api)),
-          ChangeNotifierProvider(create: (_) => CartService(api)),
-          ChangeNotifierProvider(create: (_) => ReservationService(api)),
-          ChangeNotifierProvider(create: (_) => VirtualFittingService(api)),
+          ChangeNotifierProvider(create: (_) => AutenticacionService(api, storage)),
+          ChangeNotifierProvider(create: (_) => CatalogoService(api)),
+          ChangeNotifierProvider(create: (_) => CarritoService(api)),
+          ChangeNotifierProvider(create: (_) => ReservaService(api)),
+          ChangeNotifierProvider(create: (_) => VestidorVirtualService(api)),
           ChangeNotifierProvider.value(value: notifications),
         ],
         child: MaterialApp(
-          theme: AppTheme.lightTheme,
+          theme: TemaApp.lightTheme,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context)
                 .copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
           ),
-          home: RepaintBoundary(key: boundary, child: const HomeScreen()),
+          home: RepaintBoundary(key: boundary, child: const InicioScreen()),
         ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/virtual-fitting-hero.png'),
+        tester.element(find.byType(InicioScreen)),
       ),
     );
     await tester.pumpAndSettle();

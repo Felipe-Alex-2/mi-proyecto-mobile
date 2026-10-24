@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/cart_service.dart';
-import 'package:mobile/services/notification_service.dart';
-import 'package:mobile/services/reservation_service.dart';
-import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/carrito_service.dart';
+import 'package:mobile/servicios/notificacion_service.dart';
+import 'package:mobile/servicios/reserva_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
 
-class _Storage extends StorageService {
+class _Storage extends AlmacenamientoService {
   @override
   Future<String?> getAccessToken() async => 'test-token';
 }
@@ -101,7 +101,7 @@ void main() {
   test('cart shares concurrent loads and exposes connection errors', () async {
     final api = _ControlledApi();
     addTearDown(api.dispose);
-    final cart = CartService(api);
+    final cart = CarritoService(api);
     addTearDown(cart.dispose);
     final first = cart.loadCart();
     final second = cart.loadCart();
@@ -119,7 +119,7 @@ void main() {
     () async {
       final api = _ControlledApi();
       addTearDown(api.dispose);
-      final reservations = ReservationService(api);
+      final reservations = ReservaService(api);
       final first = reservations.loadReservations();
       final second = reservations.loadReservations();
       expect(api.calls, 1);
@@ -133,7 +133,7 @@ void main() {
     'notifications do not poll before an authenticated home starts them',
     (tester) async {
       final api = _ControlledApi();
-      final notifications = NotificationService(api);
+      final notifications = NotificacionService(api);
       await tester.pump(const Duration(seconds: 30));
       expect(api.calls, 0);
       notifications.dispose();
@@ -146,7 +146,7 @@ void main() {
     () async {
       final api = _ControlledApi();
       addTearDown(api.dispose);
-      final notifications = NotificationService(api);
+      final notifications = NotificacionService(api);
       addTearDown(notifications.dispose);
       final first = notifications.loadNotifications(silent: true);
       final second = notifications.loadNotifications(silent: true);
@@ -166,7 +166,7 @@ void main() {
       client: MockClient((_) async => http.Response('[]', 200)),
     );
     addTearDown(api.dispose);
-    final notifications = NotificationService(api);
+    final notifications = NotificacionService(api);
     addTearDown(notifications.dispose);
     var rebuilds = 0;
     notifications.addListener(() => rebuilds++);

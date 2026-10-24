@@ -1,105 +1,101 @@
+import 'widgets/selector_tienda.dart';
+
 import 'package:flutter/foundation.dart';
 
-import 'services/offline_store.dart';
-import 'services/background_sync.dart';
-import 'services/offline_service.dart';
-import 'services/biometric_service.dart';
-import 'widgets/offline_status.dart';
-import 'widgets/session_lock.dart';
+import 'servicios/almacen_sin_conexion.dart';
+import 'servicios/sincronizacion_segundo_plano.dart';
+import 'servicios/sin_conexion_service.dart';
+import 'servicios/biometria_service.dart';
+import 'widgets/estado_sin_conexion.dart';
+import 'widgets/bloqueo_sesion.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'config/theme.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/home/home_screen.dart';
-import 'services/api_service.dart';
-import 'services/auth_service.dart';
-import 'services/catalog_service.dart';
-import 'services/cart_service.dart';
-import 'services/reservation_service.dart';
-import 'services/notification_service.dart';
-import 'services/storage_service.dart';
-import 'services/virtual_fitting_service.dart';
-import 'services/recommendation_service.dart';
+import 'configuracion/tema.dart';
+import 'pantallas/autenticacion/inicio_sesion_screen.dart';
+import 'pantallas/inicio/inicio_screen.dart';
+import 'servicios/api_service.dart';
+import 'servicios/autenticacion_service.dart';
+import 'servicios/catalogo_service.dart';
+import 'servicios/carrito_service.dart';
+import 'servicios/reserva_service.dart';
+import 'servicios/notificacion_service.dart';
+import 'servicios/almacenamiento_service.dart';
+import 'servicios/vestidor_virtual_service.dart';
+import 'servicios/recomendacion_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await BackgroundSync.initialize();
-  final storageService = StorageService();
+  await SincronizacionSegundoPlano.initialize();
+  final storageService = AlmacenamientoService();
   final apiService = ApiService(storageService);
-  OfflineService? offline;
+  SinConexionService? offline;
   if (!kIsWeb &&
       {
         TargetPlatform.android,
         TargetPlatform.iOS,
         TargetPlatform.macOS,
       }.contains(defaultTargetPlatform)) {
-    offline = OfflineService(
-      await OfflineStore.open(),
+    offline = SinConexionService(
+      await AlmacenSinConexion.open(),
       (method, path, body) => apiService.sendOnline(method, path, body),
     );
     apiService.offline = offline;
     offline.start();
   }
-  final authService = AuthService(
+  final authService = AutenticacionService(
     apiService,
     storageService,
     offline: offline,
-    biometrics: BiometricService(),
+    biometrics: BiometriaService(),
   );
-  final catalogService = CatalogService(apiService);
 
   runApp(
     MultiProvider(
       providers: [
-        Provider<StorageService>.value(value: storageService),
+        Provider<AlmacenamientoService>.value(value: storageService),
         if (offline != null)
-          ChangeNotifierProvider<OfflineService>.value(value: offline),
+          ChangeNotifierProvider<SinConexionService>.value(value: offline),
         Provider<ApiService>(
           create: (_) => apiService,
           dispose: (_, service) => service.dispose(),
         ),
-        ChangeNotifierProvider<AuthService>.value(value: authService),
-        ChangeNotifierProvider<CatalogService>.value(value: catalogService),
+        ChangeNotifierProvider<AutenticacionService>.value(value: authService),
       ],
-      child: const MyApp(),
+      child: const VestaApp(),
     ),
   );
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class VestaApp extends StatefulWidget {
+  const VestaApp({super.key});
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<VestaApp> createState() => _VestaAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _VestaAppState extends State<VestaApp> {
   GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   String? _navigationOwner;
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthService>();
+    final auth = context.watch<AutenticacionService>();
     final owner = auth.status == AuthStatus.authenticated
-        ? auth.currentUser!.id
+        ? auth.currentUser!.scopeKey
         : 'guest';
     if (_navigationOwner != owner) {
       _navigationOwner = owner;
       _navigatorKey = GlobalKey<NavigatorState>();
     }
-    return SessionLock(
+    return BloqueoSesion(
       auth: auth,
       child: MaterialApp(
         navigatorKey: _navigatorKey,
-        key: ValueKey(
-          auth.status == AuthStatus.authenticated
-              ? auth.currentUser!.id
-              : 'guest',
-        ),
+        key: ValueKey(owner),
         title: 'FashionStore VESTA',
-        theme: AppTheme.lightTheme,
+        theme: TemaApp.lightTheme,
         debugShowCheckedModeBanner: false,
         builder: (context, child) {
           if (auth.status != AuthStatus.authenticated) return child!;
@@ -107,31 +103,32 @@ class _MyAppState extends State<MyApp> {
           // Personal data belongs to one authenticated session. Wrap the
           // Navigator so pushed routes share this scope as well as the home page.
           return MultiProvider(
-            key: ValueKey(auth.currentUser!.id),
+            key: ValueKey(auth.currentUser!.scopeKey),
             providers: [
-              ChangeNotifierProvider(create: (_) => CartService(api)),
-              ChangeNotifierProvider(create: (_) => ReservationService(api)),
-              ChangeNotifierProvider(create: (_) => NotificationService(api)),
-              ChangeNotifierProvider(create: (_) => VirtualFittingService(api)),
-              ChangeNotifierProvider(create: (_) => RecommendationService(api)),
+              ChangeNotifierProvider(create: (_) => CatalogoService(api)),
+              ChangeNotifierProvider(create: (_) => CarritoService(api)),
+              ChangeNotifierProvider(create: (_) => ReservaService(api)),
+              ChangeNotifierProvider(create: (_) => NotificacionService(api)),
+              ChangeNotifierProvider(create: (_) => VestidorVirtualService(api)),
+              ChangeNotifierProvider(create: (_) => RecomendacionService(api)),
             ],
             child: context.read<ApiService>().offline == null
                 ? child!
-                : OfflineStatus(navigatorKey: _navigatorKey, child: child!),
+                : EstadoSinConexion(navigatorKey: _navigatorKey, child: child!),
           );
         },
-        home: const AuthGate(),
+        home: const AccesoAutenticacion(),
       ),
     );
   }
 }
 
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+class AccesoAutenticacion extends StatelessWidget {
+  const AccesoAutenticacion({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = context.watch<AuthService>();
+    final authService = context.watch<AutenticacionService>();
 
     switch (authService.status) {
       case AuthStatus.locked:
@@ -166,10 +163,23 @@ class AuthGate extends StatelessWidget {
       case AuthStatus.uninitialized:
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       case AuthStatus.authenticated:
-        return const HomeScreen();
+        final user = authService.currentUser!;
+        if (user.role == 'CUSTOMER' && user.branchId == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Elige tu tienda')),
+            body: SingleChildScrollView(
+              child: SelectorTienda(
+                tenantId: user.selectedTenantId,
+                onSelected: (tenant, branch) =>
+                    authService.selectStore(tenant, branch),
+              ),
+            ),
+          );
+        }
+        return const InicioScreen();
       case AuthStatus.unauthenticated:
       case AuthStatus.authenticating:
-        return const LoginScreen();
+        return const InicioSesionScreen();
     }
   }
 }

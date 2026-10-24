@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile/config/theme.dart';
-import 'package:mobile/screens/auth/login_screen.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/auth_service.dart';
-import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/configuracion/tema.dart';
+import 'package:mobile/pantallas/autenticacion/inicio_sesion_screen.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/autenticacion_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
 
 void main() {
-  testWidgets('LoginScreen renders email, password, and login button', (
+  testWidgets('InicioSesionScreen renders email, password, and login button', (
     WidgetTester tester,
   ) async {
-    final storageService = StorageService();
+    final storageService = AlmacenamientoService();
     final apiService = ApiService(storageService);
-    final authService = AuthService(apiService, storageService);
+    final authService = AutenticacionService(apiService, storageService);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          Provider<StorageService>.value(value: storageService),
+          Provider<AlmacenamientoService>.value(value: storageService),
           Provider<ApiService>.value(value: apiService),
-          ChangeNotifierProvider<AuthService>.value(value: authService),
+          ChangeNotifierProvider<AutenticacionService>.value(value: authService),
         ],
         child: MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const LoginScreen(),
+          theme: TemaApp.lightTheme,
+          home: const InicioSesionScreen(),
         ),
       ),
     );

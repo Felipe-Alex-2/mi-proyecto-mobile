@@ -4,12 +4,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/auth_service.dart';
-import 'package:mobile/services/biometric_service.dart';
-import 'package:mobile/services/storage_service.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/autenticacion_service.dart';
+import 'package:mobile/servicios/biometria_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
 
-class Device extends BiometricService {
+class Device extends BiometriaService {
   bool accepted = false;
   bool enabled = true;
   @override
@@ -47,7 +47,7 @@ void main() {
   );
   test('startup with biometric preference stays locked until successful verification', () async {
     var requests = 0;
-    final storage = StorageService();
+    final storage = AlmacenamientoService();
     final api = ApiService(
       storage,
       client: MockClient((_) async {
@@ -56,7 +56,7 @@ void main() {
       }),
     );
     final device = Device();
-    final auth = AuthService(api, storage, biometrics: device);
+    final auth = AutenticacionService(api, storage, biometrics: device);
     await Future<void>.delayed(const Duration(milliseconds: 30));
     expect(auth.status, AuthStatus.locked);
     expect(requests, 0);
@@ -74,13 +74,13 @@ void main() {
   test(
     'disable removes biometric preference and logout removes credentials',
     () async {
-      final storage = StorageService();
+      final storage = AlmacenamientoService();
       final api = ApiService(
         storage,
         client: MockClient((_) async => http.Response(jsonEncode(user), 200)),
       );
       final device = Device()..accepted = true;
-      final auth = AuthService(api, storage, biometrics: device);
+      final auth = AutenticacionService(api, storage, biometrics: device);
       await Future<void>.delayed(const Duration(milliseconds: 30));
       await auth.unlock();
       expect(await auth.setBiometric(false), isTrue);

@@ -2,26 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile/config/theme.dart';
-import 'package:mobile/models/user.dart';
-import 'package:mobile/screens/profile/profile_screen.dart';
-import 'package:mobile/services/auth_service.dart';
-import 'package:mobile/services/api_service.dart';
-import 'package:mobile/services/storage_service.dart';
-import 'package:mobile/utils/validators.dart';
+import 'package:mobile/configuracion/tema.dart';
+import 'package:mobile/modelos/usuario.dart';
+import 'package:mobile/pantallas/perfil/perfil_screen.dart';
+import 'package:mobile/servicios/autenticacion_service.dart';
+import 'package:mobile/servicios/api_service.dart';
+import 'package:mobile/servicios/almacenamiento_service.dart';
+import 'package:mobile/utilidades/validadores.dart';
 
-class _Storage extends StorageService {
+class _Storage extends AlmacenamientoService {
   @override
   Future<bool> hasToken() async => false;
 }
 
-class _Auth extends AuthService {
+class _Auth extends AutenticacionService {
   _Auth(super.api, super.storage);
   int saves = 0;
   String? savedAvatar;
   bool? clearedPhoto;
   @override
-  User get currentUser => User.fromJson({
+  Usuario get currentUser => Usuario.fromJson({
     'id': '1',
     'email': 'cliente@example.com',
     'full_name': 'Cliente VESTA',
@@ -54,11 +54,11 @@ void main() {
   });
   test('email validation accepts long domains and tagged addresses', () {
     expect(
-      AppValidators.validateEmail('cliente+vesta@example.technology'),
+      ValidadoresApp.validarCorreo('cliente+vesta@example.technology'),
       isNull,
     );
-    expect(AppValidators.validateEmail('  '), isNotNull);
-    expect(AppValidators.validateEmail('cliente@'), isNotNull);
+    expect(ValidadoresApp.validarCorreo('  '), isNotNull);
+    expect(ValidadoresApp.validarCorreo('cliente@'), isNotNull);
   });
   testWidgets('profile offers three avatars and rejects blank names', (
     tester,
@@ -71,11 +71,11 @@ void main() {
     final api = ApiService(storage);
     final auth = _Auth(api, storage);
     await tester.pumpWidget(
-      ChangeNotifierProvider<AuthService>.value(
+      ChangeNotifierProvider<AutenticacionService>.value(
         value: auth,
         child: MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: const ProfileScreen(),
+          theme: TemaApp.lightTheme,
+          home: const PerfilScreen(),
         ),
       ),
     );
@@ -86,17 +86,42 @@ void main() {
     await tester.tap(find.text('Salvia'));
     await tester.pump();
     await tester.enterText(find.byType(TextFormField).first, '   ');
-    await tester.ensureVisible(find.text('Guardar cambios'));
+    await tester.scrollUntilVisible(
+      find.text('Guardar cambios'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Guardar cambios'));
     await tester.pump();
     expect(auth.saves, 0);
     await tester.enterText(find.byType(TextFormField).first, 'Cliente VESTA');
-    await tester.ensureVisible(find.text('Guardar cambios'));
+    await tester.scrollUntilVisible(
+      find.text('Guardar cambios'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Guardar cambios'));
     await tester.pumpAndSettle();
     expect(auth.saves, 1);
     expect(auth.savedAvatar, 'sage');
     expect(auth.clearedPhoto, isTrue);
+    expect(find.text('Cambios guardados.'), findsOneWidget);
+    expect(find.textContaining('Pendientes de sincronizar'), findsNothing);
+    auth.profileSavePending = true;
+    await tester.scrollUntilVisible(
+      find.text('Guardar cambios'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Guardar cambios'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Cambios guardados en el dispositivo. Pendientes de sincronizar.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cambios guardados.'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     auth.dispose();
