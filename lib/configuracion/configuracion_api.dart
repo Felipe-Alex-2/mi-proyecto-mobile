@@ -10,8 +10,8 @@ class ConfiguracionApi {
   // Backend local para emulador de Android (10.0.2.2 apunta al localhost de la PC)
   static const String _androidEmulatorUrl = 'http://10.0.2.2:8000/api/v1';
 
-  // Activa backend local por defecto para desarrollo.
-  static const bool useLocal = true;
+  // Usa el backend desplegado por defecto, tanto en desarrollo como en release.
+  static const bool useLocal = false;
 
   static String get baseUrl {
     // Permite pasar URL por línea de comandos: flutter run --dart-define=API_URL=http://...
