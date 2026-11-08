@@ -91,6 +91,11 @@ class _ReportesScreenState extends State<ReportesScreen> {
     'reservations_status': 'Estado de reservas',
     'reservations_by_branch': 'Reservas por sucursal',
     'products_by_supplier': 'Catálogo por proveedor',
+    'products_detail': 'Detalle de prendas en stock',
+    'companies_list': 'Empresas existentes',
+    'branches_list': 'Sucursales de todas las empresas',
+    'payments_detail': 'Detalle de pagos',
+    'wallet_topups': 'Recargas de wallet',
     'registered_customers': 'Clientes registrados',
   };
   @override
@@ -104,13 +109,13 @@ class _ReportesScreenState extends State<ReportesScreen> {
   Future<void> _load() async {
     final user = context.read<AutenticacionService>().currentUser!;
     setState(() {
-      _global = user.isSaasAdmin;
+      _global = true;
       _ai = user.isSaasAdmin;
-      _branch = user.role == 'ADMIN' ? '' : user.branchId ?? '';
+      _branch = '';
     });
     final api = context.read<ApiService>();
     try {
-      final rows = await api.getOnline('/branches');
+      final rows = await api.getOnline('/reports/branches');
       if (mounted) setState(() => _branches = rows as List);
     } catch (e) {
       if (mounted) {
@@ -319,25 +324,24 @@ class _ReportesScreenState extends State<ReportesScreen> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
-          if (user.isSaasAdmin)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Todas las empresas y sucursales'),
-              value: _global,
-              onChanged: _busy
-                  ? null
-                  : (v) {
-                      _stopReading();
-                      setState(() {
-                        _global = v;
-                        _branch = '';
-                        _report = null;
-                        if (!v && _type == 'sales_by_company') {
-                          _type = 'sales_by_branch';
-                        }
-                      });
-                    },
-            ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Todas las empresas y sucursales'),
+            value: _global,
+            onChanged: _busy
+                ? null
+                : (v) {
+                    _stopReading();
+                    setState(() {
+                      _global = v;
+                      _branch = '';
+                      _report = null;
+                      if (!v && _type == 'sales_by_company') {
+                        _type = 'sales_by_branch';
+                      }
+                    });
+                  },
+          ),
           if (!_global)
             DropdownButtonFormField<String>(
               key: ValueKey('branch_$_branch'),
@@ -345,23 +349,18 @@ class _ReportesScreenState extends State<ReportesScreen> {
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Sucursal'),
               items: [
-                if (user.role == 'ADMIN')
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text('Todas las sucursales'),
+                const DropdownMenuItem(
+                  value: '',
+                  child: Text('Todas las sucursales'),
+                ),
+                ..._branches.map(
+                  (b) => DropdownMenuItem(
+                    value: '${b['id']}',
+                    child: Text('${b['company_name']} · ${b['name']}'),
                   ),
-                ..._branches
-                    .where(
-                      (b) => user.role == 'ADMIN' || b['id'] == user.branchId,
-                    )
-                    .map(
-                      (b) => DropdownMenuItem(
-                        value: '${b['id']}',
-                        child: Text('${b['name']}'),
-                      ),
-                    ),
+                ),
               ],
-              onChanged: _busy || user.role != 'ADMIN'
+              onChanged: _busy
                   ? null
                   : (v) {
                       _stopReading();
@@ -381,22 +380,8 @@ class _ReportesScreenState extends State<ReportesScreen> {
             decoration: const InputDecoration(labelText: 'Tipo de reporte'),
             items: [
               for (final type in types.entries)
-                DropdownMenuItem(
-                  value: type.key,
-                  child: Text(
-                    user.role == 'CUSTOMER'
-                        ? ({
-                                'sales_by_branch': 'Mis compras por sucursal',
-                                'reservations_status': 'Estado de mis reservas',
-                                'reservations_by_branch':
-                                    'Mis reservas por sucursal',
-                                'registered_customers': 'Mi cuenta registrada',
-                              }[type.key] ??
-                              type.value)
-                        : type.value,
-                  ),
-                ),
-              if (user.isSaasAdmin && _global)
+                DropdownMenuItem(value: type.key, child: Text(type.value)),
+              if (_global)
                 const DropdownMenuItem(
                   value: 'sales_by_company',
                   child: Text('Ventas cobradas por empresa'),
@@ -464,14 +449,15 @@ class _ReportesScreenState extends State<ReportesScreen> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           if (!_ai)
-            const Text('Tu plan debe incluir reportes con lenguaje natural.'),
+            const Text(
+              'Consultas frecuentes disponibles. La interpretación avanzada requiere configurar Gemini.',
+            ),
           TextField(
             controller: _transcript,
             maxLines: 3,
             decoration: const InputDecoration(
               labelText: 'Tu consulta',
-              hintText:
-                  '¿Qué empresa vende más? ¿Qué sucursal tiene más prendas?',
+              hintText: 'Lista las empresas existentes. Mis pagos de este mes.',
             ),
           ),
           const SizedBox(height: 8),
@@ -479,12 +465,12 @@ class _ReportesScreenState extends State<ReportesScreen> {
             spacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: _busy || !_ai ? null : _listen,
+                onPressed: _busy ? null : _listen,
                 icon: Icon(_listening ? Icons.stop : Icons.mic),
                 label: Text(_listening ? 'Detener' : 'Hablar'),
               ),
               FilledButton(
-                onPressed: _busy || !_ai ? null : () => _generate(voice: true),
+                onPressed: _busy ? null : () => _generate(voice: true),
                 child: const Text('Procesar texto'),
               ),
             ],

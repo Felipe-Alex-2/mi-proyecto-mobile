@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../servicios/api_service.dart';
 
@@ -35,6 +36,31 @@ class _HistorialComprasScreenState extends State<HistorialComprasScreen> {
       if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pdf(Map<String, dynamic> p) async {
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size;
+      final bytes = await context.read<ApiService>().getBytes(
+        '/saas/history/${Uri.encodeComponent(p['id'].toString())}/invoice',
+      );
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, mimeType: 'application/pdf')],
+          fileNameOverrides: ['comprobante-vesta.pdf'],
+          sharePositionOrigin: origin,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
   }
 
@@ -86,6 +112,12 @@ class _HistorialComprasScreenState extends State<HistorialComprasScreen> {
           ),
         ),
         actions: [
+          if (p['status'] == 'PAID')
+            TextButton.icon(
+              onPressed: () => _pdf(p),
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              label: const Text('Compartir PDF'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cerrar'),
@@ -112,7 +144,7 @@ class _HistorialComprasScreenState extends State<HistorialComprasScreen> {
                 if (_error != null) Text(_error!),
                 if (_payments.isEmpty && _error == null)
                   const Text(
-                    'Todavía no tienes comprobantes de caja. Las reservas pagadas están en Mis reservas.',
+                    'Aquí aparecerán tus pagos y recargas cuando realices una operación.',
                   ),
                 for (final p in _payments)
                   Card(
@@ -121,7 +153,7 @@ class _HistorialComprasScreenState extends State<HistorialComprasScreen> {
                         '${p['payment_code']} · ${p['amount']} ${p['currency']}',
                       ),
                       subtitle: Text(
-                        '${p['company_name']} · ${p['branch_name']}',
+                        '${p['concept']} · ${p['company_name']} · ${p['status'] == 'PAID' ? 'Pagado' : 'Pendiente'}',
                       ),
                       trailing: const Icon(Icons.receipt_long_outlined),
                       onTap: () => _receipt(p),

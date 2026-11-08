@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../configuracion/tema.dart';
 import '../modelos/producto.dart';
 import '../pantallas/catalogo/detalle_producto_screen.dart';
-import '../pantallas/vestidor_virtual/vestidor_virtual_screen.dart';
 import 'foto_producto.dart';
 
 class PrendaCard extends StatelessWidget {
@@ -165,12 +164,12 @@ class PrendaCard extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) =>
-                              VestidorVirtualScreen(initialProduct: product),
+                              DetalleProductoScreen(product: product),
                         ),
                       ),
-                icon: const Icon(Icons.checkroom_outlined, size: 16),
+                icon: const Icon(Icons.add_shopping_cart_outlined, size: 16),
                 label: const Text(
-                  'Probar en mí',
+                  'Añadir al carrito',
                   style: TextStyle(fontSize: 12),
                 ),
               ),

@@ -112,7 +112,7 @@ void main() {
     },
   );
   testWidgets(
-    'mobile reports request global results only for platform account and mail the logged-in user',
+    'mobile reports request global results and mail the logged-in user',
     (tester) async {
       tester.view.physicalSize = const Size(360, 900);
       tester.view.devicePixelRatio = 1;
@@ -198,8 +198,8 @@ void main() {
     });
     expect(Usuario.fromJson(user.toJson()).isSaasAdmin, isTrue);
   });
-  for (final role in ['CUSTOMER', 'CASHIER']) {
-    testWidgets('$role can open and generate a scoped mobile report', (
+  for (final role in ['CUSTOMER', 'CASHIER', 'STORE_MANAGER', 'ADMIN']) {
+    testWidgets('$role can open and generate a global mobile report', (
       tester,
     ) async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -220,7 +220,16 @@ void main() {
             return jsonResponse(
               request.url.path.endsWith('/branches')
                   ? [
-                      {'id': 'branch', 'name': 'Central'},
+                      {
+                        'id': 'branch',
+                        'name': 'Central',
+                        'company_name': 'VESTA',
+                      },
+                      {
+                        'id': 'foreign',
+                        'name': 'Otra',
+                        'company_name': 'MODAT',
+                      },
                     ]
                   : {'ai_reports': true},
             );
@@ -250,12 +259,23 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Reporte manual'), findsOneWidget);
-      expect(find.text('Todas las empresas y sucursales'), findsNothing);
+      expect(find.text('Todas las empresas y sucursales'), findsOneWidget);
       await tester.tap(find.text('Generar reporte'));
       await tester.pumpAndSettle();
-      expect(body?['branch_id'], 'branch');
-      expect(body?['all_companies'], isFalse);
+      expect(body?['branch_id'], isNull);
+      expect(body?['all_companies'], isTrue);
       expect(body?['email_self'], isTrue);
+      await tester.tap(find.byType(SwitchListTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('branch_')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('MODAT · Otra').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Generar reporte'));
+      await tester.tap(find.text('Generar reporte'));
+      await tester.pumpAndSettle();
+      expect(body?['branch_id'], 'foreign');
+      expect(body?['all_companies'], isFalse);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

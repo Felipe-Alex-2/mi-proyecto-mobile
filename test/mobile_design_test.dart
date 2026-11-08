@@ -90,7 +90,9 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AutenticacionService(api, storage)),
+          ChangeNotifierProvider(
+            create: (_) => AutenticacionService(api, storage),
+          ),
           ChangeNotifierProvider(create: (_) => CatalogoService(api)),
           ChangeNotifierProvider(create: (_) => CarritoService(api)),
           ChangeNotifierProvider(create: (_) => ReservaService(api)),
@@ -157,7 +159,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Blusa de lino'), findsOneWidget);
       expect(find.text('Sobrecamisa de algodón'), findsNothing);
-      await tester.tap(find.text('Probar en mí').first);
+      await tester.tap(find.text('Añadir al carrito').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Probarse'), findsOneWidget);
+      await tester.tap(find.text('Probarse'));
       await tester.pumpAndSettle();
       // Dismiss the existing measurement sheet to inspect the fitting screen.
       final context = tester.element(

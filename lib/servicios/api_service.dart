@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -144,6 +145,19 @@ class ApiService {
     }
 
     return headers;
+  }
+
+  Future<Uint8List> getBytes(String endpoint) async {
+    final url = Uri.parse('${ConfiguracionApi.baseUrl}$endpoint');
+    final headers = await _getHeaders();
+    headers['Accept'] = 'application/pdf';
+    final response = await _client
+        .get(url, headers: headers)
+        .timeout(requestTimeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _processResponse(response);
+    }
+    return response.bodyBytes;
   }
 
   Future<dynamic> getOnline(String endpoint, {bool includeAuth = true}) async {

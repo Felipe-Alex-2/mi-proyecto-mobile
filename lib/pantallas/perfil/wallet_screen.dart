@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../servicios/api_service.dart';
 import '../../utilidades/request_id.dart';
+import 'historial_compras_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -56,7 +57,10 @@ class _WalletScreenState extends State<WalletScreen>
   }
 
   Future<void> _open(String url) async {
-    if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+    if (!await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    )) {
       throw Exception('No se pudo abrir PayPal Sandbox.');
     }
   }
@@ -108,7 +112,7 @@ class _WalletScreenState extends State<WalletScreen>
       if (mounted) {
         setState(() {
           _data = Map<String, dynamic>.from(value);
-          _message = 'Recarga confirmada. Saldo actualizado.';
+          _message = 'Recarga confirmada. Tu comprobante está en Mis compras y comprobantes.';
           _awaiting = null;
         });
       }
@@ -149,6 +153,14 @@ class _WalletScreenState extends State<WalletScreen>
           ),
           const Text(
             'Saldo disponible en esta empresa. Se usa para pagar tus prendas; las recargas no generan puntos.',
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HistorialComprasScreen()),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('Mis compras y comprobantes'),
           ),
           const SizedBox(height: 24),
           Text(
