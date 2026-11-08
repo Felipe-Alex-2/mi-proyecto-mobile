@@ -74,4 +74,14 @@ class AlmacenamientoService {
       return false;
     }
   }
+
+  Future<String?> getPushInstallation() =>
+      _storage.read(key: 'push_installation_id');
+  Future<void> savePushInstallation(String id) =>
+      _storage.write(key: 'push_installation_id', value: id);
+
+  Future<bool> pushDisabledFor(String userId) async =>
+      await _storage.read(key: 'push_disabled_$userId') == 'true';
+  Future<void> setPushDisabled(String userId, bool value) =>
+      _storage.write(key: 'push_disabled_$userId', value: '$value');
 }

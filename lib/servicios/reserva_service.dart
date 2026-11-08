@@ -50,9 +50,7 @@ class ReservaService extends SesionNotifier {
       final data = await _apiService.get('/reservations');
       _reservations =
           (data as List<dynamic>?)
-              ?.map(
-                (item) => Reserva.fromJson(item as Map<String, dynamic>),
-              )
+              ?.map((item) => Reserva.fromJson(item as Map<String, dynamic>))
               .toList() ??
           [];
       _hasLoaded = true;
@@ -71,6 +69,9 @@ class ReservaService extends SesionNotifier {
     required String branchId,
     required List<Map<String, dynamic>> items,
     String? customerNotes,
+    String? couponCode,
+    String paymentMethod = 'EFECTIVO',
+    String? idempotencyKey,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -78,12 +79,20 @@ class ReservaService extends SesionNotifier {
     try {
       final body = {
         'branch_id': branchId,
+        'payment_method': paymentMethod,
+        'request_id': ?idempotencyKey,
+        if (couponCode != null && couponCode.isNotEmpty)
+          'coupon_code': couponCode,
         'items': items,
         if (customerNotes != null && customerNotes.trim().isNotEmpty)
           'customer_notes': customerNotes.trim(),
       };
 
-      final data = await _apiService.post('/reservations', body: body);
+      final data =
+          paymentMethod == 'WALLET' ||
+              (couponCode != null && couponCode.isNotEmpty)
+          ? await _apiService.postOnline('/reservations', body: body)
+          : await _apiService.post('/reservations', body: body);
       final newRes = Reserva.fromJson(data);
       _reservations.insert(0, newRes);
       return newRes;
@@ -97,6 +106,7 @@ class ReservaService extends SesionNotifier {
     required String branchId,
     required List<Map<String, dynamic>> items,
     String? customerNotes,
+    String? couponCode,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -104,15 +114,22 @@ class ReservaService extends SesionNotifier {
     try {
       final body = {
         'branch_id': branchId,
+        if (couponCode != null && couponCode.isNotEmpty)
+          'coupon_code': couponCode,
         'items': items,
         if (customerNotes != null && customerNotes.trim().isNotEmpty)
           'customer_notes': customerNotes.trim(),
       };
 
-      final reservation = await _apiService.post(
-        '/reservations',
-        body: {...body, 'payment_method': 'PAYPAL'},
-      );
+      final reservation = couponCode != null && couponCode.isNotEmpty
+          ? await _apiService.postOnline(
+              '/reservations',
+              body: {...body, 'payment_method': 'PAYPAL'},
+            )
+          : await _apiService.post(
+              '/reservations',
+              body: {...body, 'payment_method': 'PAYPAL'},
+            );
       if ((reservation['id'] as String).startsWith('local:')) {
         return {'pending_sync': true, 'reservation': reservation};
       }

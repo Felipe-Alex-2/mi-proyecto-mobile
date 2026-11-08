@@ -59,9 +59,9 @@ class _ReservasScreenState extends State<ReservasScreen> {
 
     if (confirmed == true && context.mounted) {
       try {
-        final updated = await context
-            .read<ReservaService>()
-            .cancelReservation(r.id);
+        final updated = await context.read<ReservaService>().cancelReservation(
+          r.id,
+        );
         if (!context.mounted) return;
         showSaveFeedback(
           context,
@@ -116,18 +116,15 @@ class _ReservasScreenState extends State<ReservasScreen> {
                   ),
                 ),
                 tooltip: 'Notificaciones ($unread)',
-                onPressed: () => NotificacionesModal.show(context, notifService),
+                onPressed: () =>
+                    NotificacionesModal.show(context, notifService),
               );
             },
           ),
           IconButton(
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: TemaApp.brownMedium,
-            ),
+            icon: const Icon(Icons.refresh_rounded, color: TemaApp.brownMedium),
             tooltip: 'Actualizar',
-            onPressed: () =>
-                context.read<ReservaService>().loadReservations(),
+            onPressed: () => context.read<ReservaService>().loadReservations(),
           ),
         ],
       ),
@@ -307,7 +304,7 @@ class _ReservaCard extends StatelessWidget {
                     ),
                     child: Text(
                       reservation.isPaid
-                          ? '✓ Pagado (PayPal)'
+                          ? '✓ Pagado (${reservation.paymentMethod})'
                           : reservation.isPaypal
                           ? '⏳ PayPal pendiente'
                           : '⏳ Pago en Tienda',

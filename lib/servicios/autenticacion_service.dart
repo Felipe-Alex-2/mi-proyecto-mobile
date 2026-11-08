@@ -331,7 +331,12 @@ class AutenticacionService extends ChangeNotifier {
     }
   }
 
+  Future<void> Function()? beforeLogout;
+
   Future<void> logout() async {
+    try {
+      await beforeLogout?.call();
+    } catch (_) {}
     _apiService.activeTenantId = null;
     _apiService.activeBranchId = null;
     try {

@@ -1,3 +1,8 @@
+import '../../servicios/reserva_service.dart';
+import '../../servicios/push_service.dart';
+import '../perfil/wallet_screen.dart';
+import '../reportes/reportes_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -23,10 +28,39 @@ class InicioScreen extends StatefulWidget {
   State<InicioScreen> createState() => _InicioScreenState();
 }
 
-class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver {
+class _InicioScreenState extends State<InicioScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _visitedTabs = <int>{0};
   late final NotificacionService _notifications;
+  PushService? _push;
+  int _pushRevision = -1;
+  void _pushChanged() {
+    if (!mounted) return;
+    final service = _push;
+    if (service == null) return;
+    if (_pushRevision != service.revision) {
+      _pushRevision = service.revision;
+      _notifications.loadNotifications(silent: true);
+    }
+    final data = service.takeOpen();
+    if (data == null) return;
+    if (data['reservation_id'] != null) {
+      _navigateToTab(3);
+      context.read<ReservaService>().loadReservations();
+    } else if (data['kind'] == 'WALLET_TOPUP') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+    } else {
+      NotificacionesModal.show(
+        context,
+        _notifications,
+        onNavigateToTab: _navigateToTab,
+      );
+    }
+  }
 
   void _navigateToTab(int index) => setState(() {
     _visitedTabs.add(index);
@@ -46,6 +80,7 @@ class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _push?.removeListener(_pushChanged);
     _notifications.clearSession();
     super.dispose();
   }
@@ -54,6 +89,8 @@ class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     _notifications = context.read<NotificacionService>();
+    _push = context.read<PushService?>();
+    _push?.addListener(_pushChanged);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -63,6 +100,7 @@ class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver
       }
       _notifications.loadNotifications();
       _notifications.startPolling();
+      _pushChanged();
     });
   }
 
@@ -76,6 +114,7 @@ class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver
       const CatalogoScreen(),
       const CarritoScreen(),
       const ReservasScreen(),
+      const ReportesScreen(),
     ];
 
     return Scaffold(
@@ -130,6 +169,11 @@ class _InicioScreenState extends State<InicioScreen> with WidgetsBindingObserver
             icon: Icon(Icons.event_note_outlined),
             activeIcon: Icon(Icons.event_note_rounded),
             label: 'Reservas',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.assessment_outlined),
+            activeIcon: Icon(Icons.assessment),
+            label: 'Reportes',
           ),
         ],
       ),

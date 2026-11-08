@@ -1,3 +1,6 @@
+import '../../servicios/push_service.dart';
+import 'wallet_screen.dart';
+import 'puntos_screen.dart';
 import 'historial_compras_screen.dart';
 import '../../widgets/selector_tienda.dart';
 
@@ -127,23 +130,54 @@ class _PerfilScreenState extends State<PerfilScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
-        'Mi perfil',
-        style: TemaApp.editorial.copyWith(fontSize: 28),
-      ),
+      title: Text('Mi perfil', style: TemaApp.editorial.copyWith(fontSize: 28)),
     ),
     body: Form(
       key: _form,
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          if (context.watch<AutenticacionService>().currentUser?.role == 'CUSTOMER')
+          if (context.watch<PushService?>() case final push?)
+            ListTile(
+              leading: const Icon(Icons.notifications_active_outlined),
+              title: const Text('Notificaciones push'),
+              subtitle: Text(push.status),
+              trailing: push.busy
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(),
+                    )
+                  : IconButton(
+                      tooltip: push.enabled
+                          ? 'Desactivar notificaciones push'
+                          : 'Activar notificaciones push',
+                      onPressed: push.enabled ? push.disable : push.enable,
+                      icon: Icon(
+                        push.enabled
+                            ? Icons.notifications_active
+                            : Icons.notifications_off_outlined,
+                      ),
+                    ),
+            ),
+          if (context.watch<PushService?>() case final push?
+              when push.enabled && push.serverConfigured)
+            TextButton.icon(
+              onPressed: push.busy ? null : push.testNotification,
+              icon: const Icon(Icons.send_outlined),
+              label: const Text('Probar notificación push'),
+            ),
+          if (context.watch<AutenticacionService>().currentUser?.role ==
+              'CUSTOMER')
             SelectorTienda(
               tenantId: context
                   .watch<AutenticacionService>()
                   .currentUser
                   ?.selectedTenantId,
-              branchId: context.watch<AutenticacionService>().currentUser?.branchId,
+              branchId: context
+                  .watch<AutenticacionService>()
+                  .currentUser
+                  ?.branchId,
               enabled: !_saving,
               onSelected: (tenant, branch) async {
                 if (_saving) return;
@@ -305,6 +339,28 @@ class _PerfilScreenState extends State<PerfilScreen> {
               },
             ),
           const SizedBox(height: 24),
+          if (context.watch<AutenticacionService>().currentUser?.role ==
+              'CUSTOMER')
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Mi wallet'),
+              subtitle: const Text('Recargar con PayPal y pagar con saldo'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletScreen()),
+              ),
+            ),
+          ListTile(
+            leading: const Icon(Icons.redeem_outlined),
+            title: const Text('Mis puntos y canjes'),
+            subtitle: const Text('Cupones y caja misteriosa'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PuntosScreen()),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
             title: const Text('Mis compras y comprobantes'),

@@ -57,12 +57,18 @@ class CarritoItem {
 }
 
 class CarritoResponse {
+  final double? subtotalBeforeWholesale;
+  final int wholesaleDiscountPercent;
+  final double wholesaleDiscountAmount;
   final bool syncPending;
   final List<CarritoItem> items;
   final int totalItems;
   final double totalAmount;
 
   CarritoResponse({
+    this.subtotalBeforeWholesale,
+    this.wholesaleDiscountPercent = 0,
+    this.wholesaleDiscountAmount = 0,
     this.syncPending = false,
     required this.items,
     required this.totalItems,
@@ -71,10 +77,18 @@ class CarritoResponse {
 
   factory CarritoResponse.fromJson(Map<String, dynamic> json) {
     return CarritoResponse(
+      subtotalBeforeWholesale: (json['subtotal_before_wholesale'] as num?)
+          ?.toDouble(),
+      wholesaleDiscountPercent:
+          (json['wholesale_discount_percent'] as num?)?.toInt() ?? 0,
+      wholesaleDiscountAmount:
+          (json['wholesale_discount_amount'] as num?)?.toDouble() ?? 0,
       syncPending: json['_sync_pending'] == true,
       items:
           (json['items'] as List<dynamic>?)
-              ?.map((item) => CarritoItem.fromJson(item as Map<String, dynamic>))
+              ?.map(
+                (item) => CarritoItem.fromJson(item as Map<String, dynamic>),
+              )
               .toList() ??
           [],
       totalItems: json['total_items'] ?? 0,

@@ -54,16 +54,29 @@ class _HistorialComprasScreenState extends State<HistorialComprasScreen> {
             children: [
               Text(p['company_name'] ?? ''),
               Text(p['branch_name'] ?? ''),
+              if (p['status'] == 'PAID' &&
+                  (p['exchange_code'] != null || items.isNotEmpty)) ...[
+                const Text(
+                  'Código para cambios / devoluciones:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SelectableText(p['exchange_code'] ?? p['payment_code'] ?? ''),
+                const Text('Plazo: 48 horas desde la emisión del recibo.'),
+              ],
               const Divider(),
               Text(p['concept'] ?? ''),
               for (final item in items)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Text(
-                    '${item['quantity']} × ${item['product_name']} — ${item['subtotal']} ${p['currency']}',
+                    '${item['quantity']} × ${item['product_name']} — ${(item['wholesale_discount_percent'] as num? ?? 0) > 0 ? item['original_subtotal'] : item['subtotal']} ${p['currency']}',
                   ),
                 ),
               const Divider(),
+              if ((p['wholesale_discount_percent'] as num? ?? 0) > 0)
+                Text(
+                  'Venta por mayor -${p['wholesale_discount_percent']}%: -${p['wholesale_discount_amount']} ${p['currency']}',
+                ),
               Text('Total: ${p['amount']} ${p['currency']}'),
               Text('Estado: ${p['status'] == 'PAID' ? 'Pagado' : p['status']}'),
               Text('Forma de pago: ${p['payment_type'] ?? ''}'),

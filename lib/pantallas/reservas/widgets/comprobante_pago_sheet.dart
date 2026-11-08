@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../configuracion/tema.dart';
 import '../../../modelos/reserva.dart';
 
@@ -29,7 +30,9 @@ class ComprobantePagoDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final paidDate = reservation.paidAt ?? reservation.createdAt;
+    final paidDate = (reservation.receiptDate ?? reservation.createdAt)
+        .toLocal();
+    final deadline = reservation.changeDeadline?.toLocal();
     final dateStr =
         '${paidDate.day.toString().padLeft(2, '0')}/${paidDate.month.toString().padLeft(2, '0')}/${paidDate.year} ${paidDate.hour.toString().padLeft(2, '0')}:${paidDate.minute.toString().padLeft(2, '0')}';
     final total = reservation.totalAmount ?? reservation.totalEstimatedAmount;
@@ -67,7 +70,11 @@ class ComprobantePagoDialog extends StatelessWidget {
                     children: [
                       Row(
                         children: const [
-                          Icon(Icons.checkroom_rounded, color: Colors.amber, size: 22),
+                          Icon(
+                            Icons.checkroom_rounded,
+                            color: Colors.amber,
+                            size: 22,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'FASHION STORE',
@@ -83,25 +90,40 @@ class ComprobantePagoDialog extends StatelessWidget {
                       IconButton(
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white70,
+                          size: 22,
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade600,
+                      color: reservation.isPaid
+                          ? Colors.green.shade600
+                          : Colors.orange.shade700,
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-                        SizedBox(width: 6),
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
                         Text(
-                          'PAGO EXITOSO · PAYPAL SANDBOX',
+                          reservation.isPaid
+                              ? 'PAGO CONFIRMADO · ${reservation.paymentMethod}'
+                              : 'RESERVA · PAGO PENDIENTE',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -123,10 +145,7 @@ class ComprobantePagoDialog extends StatelessWidget {
                   ),
                   Text(
                     'N° REC-${reservation.reservationCode}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],
               ),
@@ -139,6 +158,42 @@ class ComprobantePagoDialog extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (reservation.isPaid) ...[
+                      const Text(
+                        'CÓDIGO PARA CAMBIOS / DEVOLUCIONES',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: TemaApp.brown,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SelectableText(
+                        reservation.changeCode,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.bold,
+                          color: TemaApp.terracotta,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Presenta este código en caja. Plazo: 48 horas desde la emisión del recibo.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: TemaApp.brownMedium,
+                        ),
+                      ),
+                      if (deadline != null)
+                        Text(
+                          'Límite: ${deadline.day.toString().padLeft(2, '0')}/${deadline.month.toString().padLeft(2, '0')}/${deadline.year} ${deadline.hour.toString().padLeft(2, '0')}:${deadline.minute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: TemaApp.brownMedium,
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
                     // Meta Info Table
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -151,23 +206,36 @@ class ComprobantePagoDialog extends StatelessWidget {
                         children: [
                           _buildMetaRow('Fecha:', dateStr),
                           const Divider(height: 12, color: Colors.black12),
-                          _buildMetaRow('Cliente:', reservation.customerName ?? 'Cliente Registrado'),
+                          _buildMetaRow(
+                            'Cliente:',
+                            reservation.customerName ?? 'Cliente Registrado',
+                          ),
                           const Divider(height: 12, color: Colors.black12),
-                          _buildMetaRow('Sucursal Retiro:', reservation.branchName ?? 'Sucursal'),
+                          _buildMetaRow(
+                            'Sucursal Retiro:',
+                            reservation.branchName ?? 'Sucursal',
+                          ),
                           if (reservation.branchAddress != null) ...[
                             const SizedBox(height: 2),
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
                                 reservation.branchAddress!,
-                                style: const TextStyle(fontSize: 11, color: TemaApp.brownMedium),
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: TemaApp.brownMedium,
+                                ),
                               ),
                             ),
                           ],
                           const Divider(height: 12, color: Colors.black12),
                           _buildMetaRow(
                             'Método de Pago:',
-                            'PayPal Sandbox (Online)',
+                            reservation.paymentMethod == 'WALLET'
+                                ? 'Wallet'
+                                : reservation.isCash
+                                ? 'Efectivo'
+                                : 'PayPal',
                             valueColor: const Color(0xFF0070BA),
                           ),
                           if (reservation.paypalOrderId != null) ...[
@@ -205,16 +273,25 @@ class ComprobantePagoDialog extends StatelessWidget {
 
                     // Items List
                     ...reservation.items.map((item) {
-                      final itemSubtotal = item.price * item.quantity;
+                      final itemSubtotal =
+                          (reservation.wholesaleDiscountPercent > 0
+                              ? (item.originalPrice ?? item.price)
+                              : item.price) *
+                          item.quantity;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: TemaApp.terracotta.withValues(alpha: 0.12),
+                                color: TemaApp.terracotta.withValues(
+                                  alpha: 0.12,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -241,7 +318,10 @@ class ComprobantePagoDialog extends StatelessWidget {
                                   ),
                                   Text(
                                     '${item.sizeName ?? ""} · ${item.colorName ?? ""}',
-                                    style: const TextStyle(fontSize: 11, color: TemaApp.brownMedium),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: TemaApp.brownMedium,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -260,28 +340,79 @@ class ComprobantePagoDialog extends StatelessWidget {
                     }),
 
                     const SizedBox(height: 12),
-                    const Divider(height: 1, thickness: 1, color: Colors.black12),
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: Colors.black12,
+                    ),
                     const SizedBox(height: 10),
 
+                    if (reservation.wholesaleDiscountPercent > 0) ...[
+                      Text(
+                        'Venta por mayor −${reservation.wholesaleDiscountPercent}%: −${reservation.wholesaleDiscountAmount.toStringAsFixed(2)} ${reservation.currency}',
+                        style: const TextStyle(
+                          color: TemaApp.terracotta,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (reservation.couponDiscountAmount > 0) ...[
+                      Text(
+                        'Cupón de puntos −${reservation.couponDiscountPercent}%: −${reservation.couponDiscountAmount.toStringAsFixed(2)} ${reservation.currency}',
+                        style: const TextStyle(
+                          color: TemaApp.terracotta,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     // Financial Summary
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Subtotal:', style: TextStyle(color: TemaApp.brownMedium, fontSize: 13)),
-                        Text('\$${total.toStringAsFixed(2)} USD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        const Text(
+                          'Subtotal:',
+                          style: TextStyle(
+                            color: TemaApp.brownMedium,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '${(reservation.subtotalBeforeWholesale ?? total).toStringAsFixed(2)} ${reservation.currency}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Impuestos (0%):', style: TextStyle(color: TemaApp.brownMedium, fontSize: 13)),
-                        Text('\$0.00 USD', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        const Text(
+                          'Impuestos (0%):',
+                          style: TextStyle(
+                            color: TemaApp.brownMedium,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '0.00 ${reservation.currency}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green.shade50,
                         borderRadius: BorderRadius.circular(8),
@@ -299,7 +430,7 @@ class ComprobantePagoDialog extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '\$${total.toStringAsFixed(2)} USD',
+                            '${total.toStringAsFixed(2)} ${reservation.currency}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
@@ -318,12 +449,18 @@ class ComprobantePagoDialog extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: const Color(0xFF1A365D).withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF1A365D).withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: const Color(0xFF1A365D).withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.storefront_rounded, color: Color(0xFF1A365D), size: 20),
+                          const Icon(
+                            Icons.storefront_rounded,
+                            color: Color(0xFF1A365D),
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -353,7 +490,9 @@ class ComprobantePagoDialog extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: const Text('Cerrar'),
                     ),
@@ -374,7 +513,9 @@ class ComprobantePagoDialog extends StatelessWidget {
                         backgroundColor: TemaApp.terracotta,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -387,13 +528,22 @@ class ComprobantePagoDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildMetaRow(String label, String value, {Color? valueColor, bool isCode = false}) {
+  Widget _buildMetaRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isCode = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: TemaApp.brownMedium, fontWeight: FontWeight.w500),
+          style: const TextStyle(
+            fontSize: 12,
+            color: TemaApp.brownMedium,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(

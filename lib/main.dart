@@ -1,3 +1,4 @@
+import 'servicios/push_service.dart';
 import 'widgets/selector_tienda.dart';
 
 import 'package:flutter/foundation.dart';
@@ -52,10 +53,14 @@ Future<void> main() async {
     biometrics: BiometriaService(),
   );
 
+  final pushService = PushService(apiService, authService, storageService);
+  await pushService.initialize();
+
   runApp(
     MultiProvider(
       providers: [
         Provider<AlmacenamientoService>.value(value: storageService),
+        ChangeNotifierProvider<PushService>.value(value: pushService),
         if (offline != null)
           ChangeNotifierProvider<SinConexionService>.value(value: offline),
         Provider<ApiService>(
@@ -109,7 +114,9 @@ class _VestaAppState extends State<VestaApp> {
               ChangeNotifierProvider(create: (_) => CarritoService(api)),
               ChangeNotifierProvider(create: (_) => ReservaService(api)),
               ChangeNotifierProvider(create: (_) => NotificacionService(api)),
-              ChangeNotifierProvider(create: (_) => VestidorVirtualService(api)),
+              ChangeNotifierProvider(
+                create: (_) => VestidorVirtualService(api),
+              ),
               ChangeNotifierProvider(create: (_) => RecomendacionService(api)),
             ],
             child: context.read<ApiService>().offline == null

@@ -1,3 +1,5 @@
+import '../modelos/venta_mayor.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -284,9 +286,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     if (body['quantity'] is num &&
-        ((body['quantity'] as num) < 1 || (body['quantity'] as num) > 50)) {
+        ((body['quantity'] as num) < 1 || (body['quantity'] as num) > 1000)) {
       throw ApiException(
-        'La cantidad debe estar entre 1 y 50',
+        'La cantidad debe estar entre 1 y 1000',
         statusCode: 422,
       );
     }
@@ -338,10 +340,20 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         'expires_at': now.add(const Duration(hours: 48)).toIso8601String(),
         'items': items,
         'total_items': items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
-        'total_estimated_amount': items.fold<double>(
-          0,
-          (n, i) => n + (i['price'] as num? ?? 0) * (i['quantity'] as int),
+        ...resumenVentaMayor(
+          items.fold<double>(
+            0,
+            (n, i) => n + (i['price'] as num? ?? 0) * (i['quantity'] as int),
+          ),
+          items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
         ),
+        'total_estimated_amount': resumenVentaMayor(
+          items.fold<double>(
+            0,
+            (n, i) => n + (i['price'] as num? ?? 0) * (i['quantity'] as int),
+          ),
+          items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
+        )['total_amount'],
         'payment_status': 'PENDING',
         'status': 'SYNC_PENDING',
       };
@@ -471,9 +483,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     return {
       'items': items,
       'total_items': items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
-      'total_amount': items.fold<double>(
-        0,
-        (n, i) => n + (i['subtotal'] as num),
+      ...resumenVentaMayor(
+        items.fold<double>(0, (n, i) => n + (i['subtotal'] as num)),
+        items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
       ),
       '_sync_pending': true,
     };

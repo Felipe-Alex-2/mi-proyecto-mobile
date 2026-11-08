@@ -1,3 +1,5 @@
+import '../../servicios/autenticacion_service.dart';
+import '../../utilidades/request_id.dart';
 import '../../widgets/error_carga.dart';
 import '../../widgets/mensaje_guardado.dart';
 
@@ -25,6 +27,7 @@ class CarritoScreen extends StatefulWidget {
 }
 
 class _CarritoScreenState extends State<CarritoScreen> {
+  final Map<String, String> _walletAttempts = {};
   Future<void> _changeCart(
     Future<CarritoResponse> Function() save, {
     String message = 'Carrito actualizado.',
@@ -78,10 +81,25 @@ class _CarritoScreenState extends State<CarritoScreen> {
       return;
     }
 
+    final canWallet =
+        context.read<AutenticacionService>().currentUser?.role == 'CUSTOMER';
+    double? walletBalance;
+    if (canWallet) {
+      try {
+        final wallet = await context.read<ApiService>().getOnline('/wallet');
+        walletBalance = (wallet['balance'] as num).toDouble();
+      } catch (_) {}
+    }
+    if (!context.mounted) return;
     String selectedBranchId = branches.first.id;
     String selectedPaymentMethod =
         initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
     final notesController = TextEditingController();
+    final couponController = TextEditingController();
+    String? appliedCoupon;
+    double? couponTotal;
+    double? couponSavings;
+    bool checkingCoupon = false;
     bool isSubmitting = false;
     String? sheetError;
 
@@ -96,6 +114,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final isPayPal = selectedPaymentMethod == 'PAYPAL';
+            final isWallet = selectedPaymentMethod == 'WALLET';
             final selectedBranch = branches.firstWhere(
               (b) => b.id == selectedBranchId,
               orElse: () => branches.first,
@@ -134,7 +153,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Prendas: ${cart.totalItems} | Total: \$ ${cart.totalAmount.toStringAsFixed(2)}',
+                    'Prendas: ${cart.totalItems} | Total: \$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: TemaApp.brownMedium,
                       fontSize: 13,
@@ -143,6 +162,20 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  const Text(
+                    'Venta por mayor: 15% de descuento desde 13 prendas.',
+                    style: TextStyle(fontSize: 12, color: TemaApp.brownMedium),
+                  ),
+                  if (cart.wholesaleDiscountPercent > 0)
+                    Text(
+                      'Subtotal: ${cart.subtotalBeforeWholesale?.toStringAsFixed(2)} · Por mayor −15%: −${cart.wholesaleDiscountAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: TemaApp.terracotta,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  const SizedBox(height: 12),
                   // Branch selector
                   const Text(
                     '1. Selecciona la sucursal de retiro *',
@@ -176,17 +209,91 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         child: Text('${b.name} (${b.city})'),
                       );
                     }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setSheetState(() {
-                          selectedBranchId = val;
-                          sheetError = null;
-                        });
-                      }
-                    },
+                    onChanged: checkingCoupon || isSubmitting
+                        ? null
+                        : (val) {
+                            if (val != null) {
+                              setSheetState(() {
+                                selectedBranchId = val;
+                                appliedCoupon = null;
+                                couponTotal = null;
+                                couponSavings = null;
+                                sheetError = null;
+                              });
+                            }
+                          },
                   ),
                   const SizedBox(height: 18),
 
+                  TextField(
+                    controller: couponController,
+                    enabled: !isSubmitting && !checkingCoupon,
+                    decoration: const InputDecoration(
+                      labelText: 'Cupón de puntos (opcional)',
+                      hintText: 'VESTA-…',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => setSheetState(() {
+                      appliedCoupon = null;
+                      couponTotal = null;
+                      couponSavings = null;
+                    }),
+                  ),
+                  TextButton(
+                    onPressed: isSubmitting || checkingCoupon
+                        ? null
+                        : () async {
+                            if (couponController.text.trim().isEmpty) return;
+                            setSheetState(() {
+                              checkingCoupon = true;
+                              sheetError = null;
+                            });
+                            try {
+                              final quote = await context
+                                  .read<ApiService>()
+                                  .postOnline(
+                                    '/own/loyalty/quote',
+                                    body: {
+                                      'code': couponController.text.trim(),
+                                      'branch_id': selectedBranchId,
+                                      'items': cart.items
+                                          .map(
+                                            (it) => {
+                                              'variant_id': it.variantId,
+                                              'quantity': it.quantity,
+                                            },
+                                          )
+                                          .toList(),
+                                    },
+                                  );
+                              if (!ctx.mounted) return;
+                              setSheetState(() {
+                                appliedCoupon = couponController.text.trim();
+                                couponTotal = (quote['total_amount'] as num)
+                                    .toDouble();
+                                couponSavings =
+                                    (quote['coupon_discount_amount'] as num)
+                                        .toDouble();
+                              });
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                setSheetState(() => sheetError = '$e');
+                              }
+                            } finally {
+                              if (ctx.mounted) {
+                                setSheetState(() => checkingCoupon = false);
+                              }
+                            }
+                          },
+                    child: Text(
+                      checkingCoupon ? 'Validando…' : 'Aplicar cupón',
+                    ),
+                  ),
+                  if (couponSavings != null)
+                    Text(
+                      'Cupón aplicado: −\$ ${couponSavings!.toStringAsFixed(2)} · Total: \$ ${couponTotal!.toStringAsFixed(2)}',
+                    ),
+                  const SizedBox(height: 18),
                   // Payment method selector
                   const Text(
                     '2. Modalidad de Pago *',
@@ -271,6 +378,27 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 10),
 
+                  if (canWallet)
+                    Card(
+                      child: ListTile(
+                        leading: Icon(
+                          isWallet
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                        ),
+                        title: const Text('Pagar con mi wallet'),
+                        subtitle: Text(
+                          walletBalance == null
+                              ? 'Consulta tu saldo en Perfil. Requiere conexión.'
+                              : 'Saldo: USD ${walletBalance.toStringAsFixed(2)} · Se descontará el total en esta empresa.',
+                        ),
+                        onTap: isSubmitting
+                            ? null
+                            : () => setSheetState(
+                                () => selectedPaymentMethod = 'WALLET',
+                              ),
+                      ),
+                    ),
                   // In-Store / Cash Option
                   InkWell(
                     onTap: () {
@@ -282,24 +410,24 @@ class _CarritoScreenState extends State<CarritoScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: !isPayPal
+                        color: selectedPaymentMethod == 'EFECTIVO'
                             ? TemaApp.terracotta.withValues(alpha: 0.08)
                             : TemaApp.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: !isPayPal
+                          color: selectedPaymentMethod == 'EFECTIVO'
                               ? TemaApp.terracotta
                               : Colors.grey.shade300,
-                          width: !isPayPal ? 2 : 1,
+                          width: selectedPaymentMethod == 'EFECTIVO' ? 2 : 1,
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            !isPayPal
+                            selectedPaymentMethod == 'EFECTIVO'
                                 ? Icons.radio_button_checked
                                 : Icons.radio_button_off,
-                            color: !isPayPal
+                            color: selectedPaymentMethod == 'EFECTIVO'
                                 ? TemaApp.terracotta
                                 : Colors.grey.shade400,
                             size: 22,
@@ -408,9 +536,16 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: isSubmitting
+                      onPressed: isSubmitting || checkingCoupon
                           ? null
                           : () async {
+                              if (couponController.text.trim().isNotEmpty &&
+                                  appliedCoupon == null) {
+                                setSheetState(
+                                  () => sheetError = 'Aplica el cupón para validar el total o borra el código.',
+                                );
+                                return;
+                              }
                               setSheetState(() {
                                 isSubmitting = true;
                                 sheetError = null;
@@ -431,6 +566,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                       .createPayPalReservationOrder(
                                         branchId: selectedBranchId,
                                         items: itemsPayload,
+                                        couponCode: appliedCoupon,
                                         customerNotes: notesController.text,
                                       );
 
@@ -467,8 +603,29 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   // Free store reservation flow
                                   final newRes = await resService
                                       .createReservation(
+                                        idempotencyKey: isWallet
+                                            ? _walletAttempts.putIfAbsent(
+                                                jsonEncode([
+                                                  selectedBranchId,
+                                                  appliedCoupon,
+                                                  cart.items
+                                                      .map(
+                                                        (i) => [
+                                                          i.id,
+                                                          i.quantity,
+                                                        ],
+                                                      )
+                                                      .toList(),
+                                                ]),
+                                                requestId,
+                                              )
+                                            : null,
+                                        paymentMethod: isWallet
+                                            ? 'WALLET'
+                                            : 'EFECTIVO',
                                         branchId: selectedBranchId,
                                         items: itemsPayload,
+                                        couponCode: appliedCoupon,
                                         customerNotes: notesController.text,
                                       );
 
@@ -480,7 +637,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   _showSuccessDialog(
                                     context,
                                     newRes,
-                                    isPaid: false,
+                                    isPaid: isWallet,
                                   );
                                 }
                               } catch (e) {
@@ -521,7 +678,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             )
                           : Text(
                               isPayPal
-                                  ? 'Pagar con PayPal (\$ ${cart.totalAmount.toStringAsFixed(2)})'
+                                  ? 'Pagar con PayPal (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
+                                  : isWallet
+                                  ? 'Pagar con wallet (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -808,7 +967,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                       pending
                           ? 'Pendiente de sincronizar'
                           : paid
-                          ? '✓ Pagado (PayPal)'
+                          ? '✓ Pagado (${r.paymentMethod})'
                           : '⏳ Pendiente (Pago en Tienda)',
                       style: TextStyle(
                         color: paid
@@ -908,10 +1067,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
         backgroundColor: TemaApp.surface,
         elevation: 0,
         foregroundColor: TemaApp.brown,
-        title: Text(
-          'Carrito',
-          style: TemaApp.editorial.copyWith(fontSize: 32),
-        ),
+        title: Text('Carrito', style: TemaApp.editorial.copyWith(fontSize: 32)),
         actions: [
           Consumer<CarritoService>(
             builder: (_, cartService, _) {
@@ -1103,6 +1259,22 @@ class _CarritoScreenState extends State<CarritoScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Desde 13 prendas: 15% de descuento por mayor.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: TemaApp.brownMedium,
+                        ),
+                      ),
+                      if (cart.wholesaleDiscountPercent > 0)
+                        Text(
+                          'Por mayor −15%: −${cart.wholesaleDiscountAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: TemaApp.terracotta,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,

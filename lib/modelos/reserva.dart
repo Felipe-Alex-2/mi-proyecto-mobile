@@ -9,6 +9,7 @@ class ReservaItem {
   final String? colorName;
   final String? colorHex;
   final double price;
+  final double? originalPrice;
   final String? imageUrl;
 
   ReservaItem({
@@ -22,6 +23,7 @@ class ReservaItem {
     this.colorName,
     this.colorHex,
     required this.price,
+    this.originalPrice,
     this.imageUrl,
   });
 
@@ -37,6 +39,7 @@ class ReservaItem {
       colorName: json['color_name'],
       colorHex: json['color_hex'],
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      originalPrice: (json['original_price'] as num?)?.toDouble(),
       imageUrl: json['image_url'],
     );
   }
@@ -47,6 +50,15 @@ class Reserva {
   final String? companyName;
   final String id;
   final String reservationCode;
+  final String? exchangeCode;
+  final DateTime? receiptIssuedAt;
+  final DateTime? exchangeDeadline;
+  final String currency;
+  final double? subtotalBeforeWholesale;
+  final int wholesaleDiscountPercent;
+  final int couponDiscountPercent;
+  final double couponDiscountAmount;
+  final double wholesaleDiscountAmount;
   final String customerId;
   final String branchId;
   final String status;
@@ -73,6 +85,15 @@ class Reserva {
     this.companyName,
     required this.id,
     required this.reservationCode,
+    this.exchangeCode,
+    this.receiptIssuedAt,
+    this.exchangeDeadline,
+    this.currency = 'USD',
+    this.subtotalBeforeWholesale,
+    this.wholesaleDiscountPercent = 0,
+    this.couponDiscountPercent = 0,
+    this.couponDiscountAmount = 0,
+    this.wholesaleDiscountAmount = 0,
     required this.customerId,
     required this.branchId,
     required this.status,
@@ -100,6 +121,20 @@ class Reserva {
       companyName: json["company_name"],
       id: json['id'] ?? '',
       reservationCode: json['reservation_code'] ?? '',
+      exchangeCode: json['exchange_code'],
+      receiptIssuedAt: _serverDate(json['receipt_issued_at']),
+      exchangeDeadline: _serverDate(json['exchange_deadline']),
+      currency: json['currency'] ?? 'USD',
+      subtotalBeforeWholesale: (json['subtotal_before_wholesale'] as num?)
+          ?.toDouble(),
+      couponDiscountPercent:
+          (json['coupon_discount_percent'] as num?)?.toInt() ?? 0,
+      couponDiscountAmount:
+          (json['coupon_discount_amount'] as num?)?.toDouble() ?? 0,
+      wholesaleDiscountPercent:
+          (json['wholesale_discount_percent'] as num?)?.toInt() ?? 0,
+      wholesaleDiscountAmount:
+          (json['wholesale_discount_amount'] as num?)?.toDouble() ?? 0,
       customerId: json['customer_id'] ?? '',
       branchId: json['branch_id'] ?? '',
       status: json['status'] ?? 'PENDING',
@@ -107,9 +142,7 @@ class Reserva {
       paymentStatus: json['payment_status'] ?? 'PENDING',
       paypalOrderId: json['paypal_order_id'],
       paypalCaptureId: json['paypal_capture_id'],
-      paidAt: json['paid_at'] != null
-          ? DateTime.tryParse(json['paid_at'])
-          : null,
+      paidAt: _serverDate(json['paid_at']),
       totalAmount: (json['total_amount'] as num?)?.toDouble(),
       customerNotes: json['customer_notes'],
       staffNotes: json['staff_notes'],
@@ -118,8 +151,7 @@ class Reserva {
       items:
           (json['items'] as List<dynamic>?)
               ?.map(
-                (item) =>
-                    ReservaItem.fromJson(item as Map<String, dynamic>),
+                (item) => ReservaItem.fromJson(item as Map<String, dynamic>),
               )
               .toList() ??
           [],
@@ -131,6 +163,21 @@ class Reserva {
           (json['total_estimated_amount'] as num?)?.toDouble() ?? 0.0,
     );
   }
+
+  static DateTime? _serverDate(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    final hasZone = RegExp(
+      r'(Z|[+-]\d{2}:\d{2})$',
+      caseSensitive: false,
+    ).hasMatch(value);
+    return DateTime.tryParse(hasZone ? value : '${value}Z');
+  }
+
+  String get changeCode =>
+      (exchangeCode?.isNotEmpty ?? false) ? exchangeCode! : reservationCode;
+  DateTime? get receiptDate => receiptIssuedAt ?? paidAt;
+  DateTime? get changeDeadline =>
+      exchangeDeadline ?? receiptDate?.add(const Duration(hours: 48));
 
   bool get isPending => status == 'PENDING' || status == 'SYNC_PENDING';
   bool get isLocal => id.startsWith('local:');

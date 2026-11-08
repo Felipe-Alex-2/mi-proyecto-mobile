@@ -1,5 +1,6 @@
 class Usuario {
   final String role;
+  final bool isSaasAdmin;
   final String? tenantId;
   final String? selectedTenantId;
   final String? branchId;
@@ -19,6 +20,7 @@ class Usuario {
 
   Usuario({
     this.role = 'CUSTOMER',
+    this.isSaasAdmin = false,
     this.tenantId,
     this.selectedTenantId,
     this.branchId,
@@ -38,6 +40,7 @@ class Usuario {
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
       role: json["role"] ?? "CUSTOMER",
+      isSaasAdmin: json["is_saas_admin"] == true,
       tenantId: json["tenant_id"],
       selectedTenantId: json["selected_tenant_id"],
       branchId: json["branch_id"],
@@ -59,6 +62,7 @@ class Usuario {
     return {
       'id': id,
       'role': role,
+      'is_saas_admin': isSaasAdmin,
       'tenant_id': tenantId,
       'selected_tenant_id': selectedTenantId,
       'branch_id': branchId,
