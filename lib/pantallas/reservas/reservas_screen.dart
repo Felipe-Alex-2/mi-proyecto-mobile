@@ -2,6 +2,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../servicios/api_service.dart';
 import '../../widgets/error_carga.dart';
+import '../../widgets/seguimiento_delivery.dart';
 import '../../widgets/mensaje_guardado.dart';
 
 import 'package:flutter/material.dart';
@@ -373,6 +374,9 @@ class _ReservaCard extends StatelessWidget {
                   child: Text(
                     reservation.isLocal
                         ? 'Guardada en el dispositivo. Espera la confirmación de disponibilidad antes de acudir a la sucursal.'
+                        : reservation.delivery != null &&
+                              reservation.delivery!['status'] != 'REJECTED'
+                        ? 'Consulta el estado de tu delivery en el seguimiento de esta reserva.'
                         : reservation.isPaid
                         ? 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                         : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} para probarse las prendas y pagar en tienda.',
@@ -392,6 +396,8 @@ class _ReservaCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
+          if (reservation.delivery != null)
+            SeguimientoDelivery(delivery: reservation.delivery!),
           // Branch & Expiry info
           Row(
             children: [

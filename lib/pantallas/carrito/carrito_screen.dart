@@ -1,6 +1,7 @@
 import '../../servicios/autenticacion_service.dart';
 import '../../utilidades/request_id.dart';
 import '../../widgets/error_carga.dart';
+import '../../widgets/opciones_entrega.dart';
 import '../../widgets/mensaje_guardado.dart';
 
 import 'dart:convert';
@@ -86,14 +87,17 @@ class _CarritoScreenState extends State<CarritoScreen> {
     double? walletBalance;
     if (canWallet) {
       try {
-        final wallet = await context.read<ApiService>().getOnline('/wallet');
+        final wallet = await context.read<ApiService>().get('/wallet');
         walletBalance = (wallet['balance'] as num).toDouble();
       } catch (_) {}
     }
     if (!context.mounted) return;
     String selectedBranchId = branches.first.id;
-    String selectedPaymentMethod =
-        initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
+    final isOffline = context.read<ApiService>().offline?.offline ?? false;
+    String selectedPaymentMethod = isOffline && initialPaymentMethod == 'PAYPAL'
+        ? 'EFECTIVO'
+        : initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
+    final deliveryKey = GlobalKey<OpcionesEntregaState>();
     final notesController = TextEditingController();
     final couponController = TextEditingController();
     String? appliedCoupon;
@@ -114,6 +118,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final isPayPal = selectedPaymentMethod == 'PAYPAL';
+            final deliveryFee = selectedPaymentMethod != 'EFECTIVO'
+                ? deliveryKey.currentState?.fee ?? 0
+                : 0;
             final isWallet = selectedPaymentMethod == 'WALLET';
             final selectedBranch = branches.firstWhere(
               (b) => b.id == selectedBranchId,
@@ -153,7 +160,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Prendas: ${cart.totalItems} | Total: \$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)}',
+                    'Prendas: ${cart.totalItems} | Total: \$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: TemaApp.brownMedium,
                       fontSize: 13,
@@ -215,6 +222,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             if (val != null) {
                               setSheetState(() {
                                 selectedBranchId = val;
+                                deliveryKey.currentState?.clearQuote();
                                 appliedCoupon = null;
                                 couponTotal = null;
                                 couponSavings = null;
@@ -305,13 +313,19 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 10),
 
+                  if (isOffline)
+                    const Text(
+                      'PayPal no está disponible sin Internet. Presencial y wallet quedan pendientes de sincronización.',
+                    ),
                   // PayPal Option
                   InkWell(
-                    onTap: () {
-                      setSheetState(() {
-                        selectedPaymentMethod = 'PAYPAL';
-                      });
-                    },
+                    onTap: isOffline
+                        ? null
+                        : () {
+                            setSheetState(() {
+                              selectedPaymentMethod = 'PAYPAL';
+                            });
+                          },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(12),
@@ -363,7 +377,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Paga en línea con tu cuenta Sandbox. Tu reserva quedará pagada y lista para recoger en la sucursal.',
+                                  'Paga en línea con tu cuenta Sandbox. Elige recoger en sucursal o solicitar delivery.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: TemaApp.brownMedium,
@@ -389,8 +403,8 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         title: const Text('Pagar con mi wallet'),
                         subtitle: Text(
                           walletBalance == null
-                              ? 'Consulta tu saldo en Perfil. Requiere conexión.'
-                              : 'Saldo: USD ${walletBalance.toStringAsFixed(2)} · Se descontará el total en esta empresa.',
+                              ? 'Abre tu wallet con Internet para guardar el saldo.'
+                              : 'Disponible: USD ${walletBalance.toStringAsFixed(2)} · ${isOffline ? 'Se descuenta localmente y queda pendiente de sincronizar.' : 'Se descontará el total en esta empresa.'}',
                         ),
                         onTap: isSubmitting
                             ? null
@@ -532,6 +546,18 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ],
                   const SizedBox(height: 18),
 
+                  if (isPayPal || isWallet)
+                    OpcionesEntrega(
+                      key: deliveryKey,
+                      branchId: selectedBranchId,
+                      enabled: !isSubmitting && !checkingCoupon,
+                      onChanged: () => setSheetState(() {}),
+                    ),
+                  if (deliveryFee > 0)
+                    Text(
+                      'Total con envío: USD ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   // Submit Button
                   SizedBox(
                     width: double.infinity,
@@ -551,6 +577,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 sheetError = null;
                               });
                               try {
+                                final deliveryPayload = (isPayPal || isWallet)
+                                    ? deliveryKey.currentState
+                                          ?.validatedPayload()
+                                    : null;
                                 final itemsPayload = cart.items
                                     .map(
                                       (it) => {
@@ -567,6 +597,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                         branchId: selectedBranchId,
                                         items: itemsPayload,
                                         couponCode: appliedCoupon,
+                                        delivery: deliveryPayload,
                                         customerNotes: notesController.text,
                                       );
 
@@ -608,6 +639,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                                 jsonEncode([
                                                   selectedBranchId,
                                                   appliedCoupon,
+                                                  deliveryPayload,
                                                   cart.items
                                                       .map(
                                                         (i) => [
@@ -626,6 +658,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                         branchId: selectedBranchId,
                                         items: itemsPayload,
                                         couponCode: appliedCoupon,
+                                        delivery: deliveryPayload,
                                         customerNotes: notesController.text,
                                       );
 
@@ -637,7 +670,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   _showSuccessDialog(
                                     context,
                                     newRes,
-                                    isPaid: isWallet,
+                                    isPaid: newRes.isPaid,
                                   );
                                 }
                               } catch (e) {
@@ -678,9 +711,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             )
                           : Text(
                               isPayPal
-                                  ? 'Pagar con PayPal (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
+                                  ? 'Pagar con PayPal (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
                                   : isWallet
-                                  ? 'Pagar con wallet (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
+                                  ? 'Pagar con wallet (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -1016,7 +1049,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                     Expanded(
                       child: Text(
                         pending
-                            ? 'Se enviará al recuperar la conexión. Espera la confirmación de disponibilidad antes de acudir a la sucursal.'
+                            ? (r.paymentMethod == 'WALLET'
+                                  ? 'El total está descontado de tu saldo local disponible. El cobro y el stock se confirmarán al recuperar Internet.'
+                                  : 'Se enviará al recuperar la conexión. Espera la confirmación de disponibilidad antes de acudir a la sucursal.')
                             : paid
                             ? 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                             : 'Presenta este código en la sucursal ${r.branchName ?? "seleccionada"} para que el personal prepare tus prendas para prueba y pago en caja.',

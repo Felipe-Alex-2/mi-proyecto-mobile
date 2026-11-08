@@ -46,6 +46,8 @@ class ReservaItem {
 }
 
 class Reserva {
+  final Map<String, dynamic>? delivery;
+  final double deliveryFee;
   final String? tenantId;
   final String? companyName;
   final String id;
@@ -81,6 +83,8 @@ class Reserva {
   final double? totalAmount;
 
   Reserva({
+    this.delivery,
+    this.deliveryFee = 0,
     this.tenantId,
     this.companyName,
     required this.id,
@@ -117,6 +121,10 @@ class Reserva {
 
   factory Reserva.fromJson(Map<String, dynamic> json) {
     return Reserva(
+      delivery: json['delivery'] is Map
+          ? Map<String, dynamic>.from(json['delivery'])
+          : null,
+      deliveryFee: (json['delivery_fee'] as num?)?.toDouble() ?? 0,
       tenantId: json["tenant_id"],
       companyName: json["company_name"],
       id: json['id'] ?? '',

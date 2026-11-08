@@ -47,7 +47,7 @@ class _WalletScreenState extends State<WalletScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final value = await context.read<ApiService>().getOnline('/wallet');
+      final value = await context.read<ApiService>().get('/wallet');
       if (mounted) setState(() => _data = Map<String, dynamic>.from(value));
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -67,6 +67,10 @@ class _WalletScreenState extends State<WalletScreen>
 
   Future<void> _topup({String? retryId, int? amount}) async {
     if (_busy) return;
+    if (context.read<ApiService>().offline?.offline ?? false) {
+      setState(() => _error = 'Recargar por PayPal necesita Internet.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -106,9 +110,15 @@ class _WalletScreenState extends State<WalletScreen>
       _message = null;
     });
     try {
-      final value = await context.read<ApiService>().postOnline(
-        '/wallet/topups/$id/capture',
-      );
+      final api = context.read<ApiService>();
+      final owner = api.offline?.owner;
+      final value = await api.postOnline('/wallet/topups/$id/capture');
+      if (owner != null) {
+        await api.offline?.rememberWallet(
+          owner,
+          Map<String, dynamic>.from(value),
+        );
+      }
       if (mounted) {
         setState(() {
           _data = Map<String, dynamic>.from(value);
@@ -162,6 +172,10 @@ class _WalletScreenState extends State<WalletScreen>
             icon: const Icon(Icons.receipt_long_outlined),
             label: const Text('Mis compras y comprobantes'),
           ),
+          if ((_data?['pending_debits'] as num? ?? 0) > 0)
+            Text(
+              'Pendiente de sincronizar: USD ${_data!['pending_debits']}. El saldo disponible ya descuenta estos pagos locales.',
+            ),
           const SizedBox(height: 24),
           Text(
             'Recargar con PayPal Sandbox',

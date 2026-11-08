@@ -70,14 +70,25 @@ class ReservaService extends SesionNotifier {
     required List<Map<String, dynamic>> items,
     String? customerNotes,
     String? couponCode,
+    Map<String, dynamic>? delivery,
     String paymentMethod = 'EFECTIVO',
     String? idempotencyKey,
   }) async {
+    if ((_apiService.offline?.offline ?? false) &&
+        (delivery != null ||
+            paymentMethod == 'PAYPAL' ||
+            (couponCode?.isNotEmpty ?? false))) {
+      throw ApiException(
+        'PayPal y la validación de cupones necesitan Internet.',
+        statusCode: 422,
+      );
+    }
     _isLoading = true;
     notifyListeners();
 
     try {
       final body = {
+        ...?delivery,
         'branch_id': branchId,
         'payment_method': paymentMethod,
         'request_id': ?idempotencyKey,
@@ -89,7 +100,10 @@ class ReservaService extends SesionNotifier {
       };
 
       final data =
-          paymentMethod == 'WALLET' ||
+          delivery != null ||
+              paymentMethod == 'PAYPAL' ||
+              (paymentMethod == 'WALLET' &&
+                  _apiService.offline?.owner == null) ||
               (couponCode != null && couponCode.isNotEmpty)
           ? await _apiService.postOnline('/reservations', body: body)
           : await _apiService.post('/reservations', body: body);
@@ -107,12 +121,20 @@ class ReservaService extends SesionNotifier {
     required List<Map<String, dynamic>> items,
     String? customerNotes,
     String? couponCode,
+    Map<String, dynamic>? delivery,
   }) async {
+    if (_apiService.offline?.offline ?? false) {
+      throw ApiException(
+        'PayPal necesita Internet. Elige pago presencial o wallet.',
+        statusCode: 0,
+      );
+    }
     _isLoading = true;
     notifyListeners();
 
     try {
       final body = {
+        ...?delivery,
         'branch_id': branchId,
         if (couponCode != null && couponCode.isNotEmpty)
           'coupon_code': couponCode,
@@ -121,15 +143,10 @@ class ReservaService extends SesionNotifier {
           'customer_notes': customerNotes.trim(),
       };
 
-      final reservation = couponCode != null && couponCode.isNotEmpty
-          ? await _apiService.postOnline(
-              '/reservations',
-              body: {...body, 'payment_method': 'PAYPAL'},
-            )
-          : await _apiService.post(
-              '/reservations',
-              body: {...body, 'payment_method': 'PAYPAL'},
-            );
+      final reservation = await _apiService.postOnline(
+        '/reservations',
+        body: {...body, 'payment_method': 'PAYPAL'},
+      );
       if ((reservation['id'] as String).startsWith('local:')) {
         return {'pending_sync': true, 'reservation': reservation};
       }

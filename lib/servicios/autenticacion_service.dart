@@ -56,6 +56,7 @@ class AutenticacionService extends ChangeNotifier {
       '/users/me',
       '/products',
       '/cart',
+      if (_currentUser?.role == 'CUSTOMER') '/wallet',
       '/reservations',
       '/branches?is_active=true',
       '/catalog/filters',

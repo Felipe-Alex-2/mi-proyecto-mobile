@@ -161,7 +161,13 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
       }
       offline = false;
       serverUnavailable = false;
-      await store.write(account, path, base);
+      if (path == '/wallet') {
+        await store.db.transaction(
+          (tx) => _saveWallet(account, Map<String, dynamic>.from(base), tx),
+        );
+      } else {
+        await store.write(account, path, base);
+      }
     } on ApiException catch (e) {
       if (e.statusCode != 0 && e.statusCode != 408 && e.statusCode < 500) {
         rethrow;
@@ -212,7 +218,73 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         : _project(account, path, base);
   }
 
+  Future<void> rememberWallet(
+    String expectedOwner,
+    Map<String, dynamic> value,
+  ) async {
+    if (owner != expectedOwner) return;
+    await store.db.transaction((tx) => _saveWallet(expectedOwner, value, tx));
+  }
+
+  bool _sameWallet(String a, String b) {
+    final aa = a.split('|'), bb = b.split('|');
+    return _sameAccount(a, b) &&
+        (aa.length < 4 || bb.length < 4 || aa[1] == bb[1]);
+  }
+
+  Future<Map<String, dynamic>> _walletProjection(
+    String account,
+    dynamic base,
+  ) async {
+    final rows = await store.db.query('outbox');
+    final holds = rows
+        .where(
+          (r) =>
+              _sameWallet(r['owner'] as String, account) &&
+              r['state'] != 'blocked' &&
+              r['path'] == '/reservations',
+        )
+        .map((r) => jsonDecode(r['body'] as String) as Map)
+        .where((b) => b['payment_method'] == 'WALLET');
+    final cents = holds.fold<int>(
+      0,
+      (n, b) => n + ((b['_wallet_expected_total'] as num) * 100).round(),
+    );
+    final confirmed = ((base['balance'] as num) * 100).round();
+    return {
+      ...Map<String, dynamic>.from(base as Map),
+      'confirmed_balance': confirmed / 100,
+      'pending_debits': cents / 100,
+      'balance': max(0, confirmed - cents) / 100,
+      '_sync_pending': cents > 0,
+    };
+  }
+
+  Future<void> _saveWallet(
+    String account,
+    Map<String, dynamic> value,
+    DatabaseExecutor tx,
+  ) async {
+    final rows = await tx.query(
+      'cache',
+      where: 'path=?',
+      whereArgs: ['/wallet'],
+    );
+    final owners = {
+      account,
+      ...rows
+          .map((r) => r['owner'] as String)
+          .where((o) => _sameWallet(o, account)),
+    };
+    for (final key in owners) {
+      await store.write(key, '/wallet', value, tx: tx);
+    }
+  }
+
   Future<dynamic> _project(String account, String path, dynamic base) async {
+    if (path == '/wallet' && base != null) {
+      return _walletProjection(account, base);
+    }
     dynamic result = jsonDecode(jsonEncode(base));
     var pending = await store.queue(account);
     if (path == '/reservations') {
@@ -246,6 +318,41 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         result = {
           ...Map<String, dynamic>.from(result as Map),
           ...body,
+          '_sync_pending': true,
+        };
+      }
+      if (path == '/cart' &&
+          target == '/reservations' &&
+          row['state'] != 'blocked') {
+        final bought = {
+          for (final item in body['items'])
+            item['variant_id']: item['quantity'] as int,
+        };
+        final items = (result['items'] as List)
+            .map((item) {
+              final quantity = max(
+                0,
+                (item['quantity'] as int) - (bought[item['variant_id']] ?? 0),
+              );
+              return {
+                ...Map<String, dynamic>.from(item as Map),
+                'quantity': quantity,
+                'subtotal': quantity * (item['price'] as num? ?? 0),
+              };
+            })
+            .where((item) => (item['quantity'] as int) > 0)
+            .toList();
+        result = {
+          ...Map<String, dynamic>.from(result as Map),
+          'items': items,
+          'total_items': items.fold<int>(
+            0,
+            (n, i) => n + (i['quantity'] as int),
+          ),
+          ...resumenVentaMayor(
+            items.fold<double>(0, (n, i) => n + (i['subtotal'] as num)),
+            items.fold<int>(0, (n, i) => n + (i['quantity'] as int)),
+          ),
           '_sync_pending': true,
         };
       }
@@ -331,6 +438,43 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
       throw ApiException('Inicia sesión para guardar cambios', statusCode: 401);
     }
     final body = Map<String, dynamic>.from(input);
+    if (path == '/reservations' && body['payment_method'] == 'PAYPAL') {
+      throw ApiException(
+        'PayPal necesita Internet. Elige pago presencial o wallet para guardar un pago pendiente.',
+        statusCode: 422,
+      );
+    }
+    if (path == '/reservations' && body['payment_method'] == 'WALLET') {
+      if ((body['coupon_code'] as String? ?? '').isNotEmpty) {
+        throw ApiException(
+          'Valida el cupón con Internet antes de pagar.',
+          statusCode: 422,
+        );
+      }
+      final previous = (await store.queue(account)).where(
+        (r) =>
+            r['path'] == path &&
+            jsonDecode(r['body'] as String)['request_id'] ==
+                body['request_id'] &&
+            body['request_id'] != null,
+      );
+      if (previous.isNotEmpty) {
+        final old = previous.first;
+        final oldBody = Map<String, dynamic>.from(
+          jsonDecode(old['body'] as String),
+        )..remove('_wallet_expected_total');
+        if (jsonEncode(oldBody) != jsonEncode(body)) {
+          throw ApiException(
+            'Este pago pendiente ya tiene otros datos.',
+            statusCode: 409,
+          );
+        }
+        return {
+          ...Map<String, dynamic>.from(jsonDecode(old['preview'] as String)),
+          'status': old['state'] == 'blocked' ? 'SYNC_FAILED' : 'SYNC_PENDING',
+        };
+      }
+    }
     if (path.startsWith('/cart/items/') && method != 'POST') {
       final cart = await _project(
         account,
@@ -415,6 +559,36 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         'payment_status': 'PENDING',
         'status': 'SYNC_PENDING',
       };
+      if (body['payment_method'] == 'WALLET') {
+        final wallet = await store.read(account, '/wallet');
+        if (wallet == null) {
+          throw ApiException(
+            'Abre tu wallet con Internet una vez para guardar el saldo de esta empresa.',
+            statusCode: 409,
+          );
+        }
+        if (items.any((i) => i['price'] == null || (i['price'] as num) <= 0)) {
+          throw ApiException(
+            'Actualiza el carrito con Internet antes de pagar con wallet.',
+            statusCode: 409,
+          );
+        }
+        final amount = (preview['total_amount'] as num);
+        final available = await _walletProjection(account, wallet);
+        if (amount <= 0 ||
+            (amount * 100).round() >
+                ((available['balance'] as num) * 100).round()) {
+          throw ApiException(
+            'Saldo local de wallet insuficiente; revisa los pagos pendientes.',
+            statusCode: 409,
+          );
+        }
+        body['request_id'] ??= id;
+        body['_wallet_expected_total'] = amount;
+        preview['request_id'] = body['request_id'];
+        preview['payment_status'] = 'SYNC_PENDING';
+        preview['wallet_pending_debit'] = amount;
+      }
     }
     if (path == '/reservations/paypal-capture') {
       final reservations = await cached('/reservations') as List? ?? [];
@@ -506,7 +680,13 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
                 'product_id': p['id'],
                 'product_name': p['name'],
                 'image_url': p['image_url'],
-                'price': v['price'] ?? p['price'] ?? 0,
+                'price':
+                    (((v['price_override'] ?? v['price'] ?? p['price'] ?? 0)
+                                as num) *
+                            (1 - (p['discount_percent'] as num? ?? 0) / 100) *
+                            100)
+                        .round() /
+                    100,
               };
             }
           }
@@ -670,6 +850,36 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             }
             if (path == '/users/me') {
               await store.write(account, path, result, tx: tx);
+            }
+            if (path == '/reservations' &&
+                jsonDecode(row['body'] as String)['payment_method'] ==
+                    'WALLET') {
+              final cached = await tx.query(
+                'cache',
+                where: 'owner=? AND path=?',
+                whereArgs: [account, '/wallet'],
+              );
+              final value = cached.isEmpty
+                  ? <String, dynamic>{}
+                  : Map<String, dynamic>.from(
+                      jsonDecode(cached.first['data'] as String),
+                    );
+              value['balance'] =
+                  result['wallet_balance'] ??
+                  max(
+                    0,
+                    (value['balance'] as num? ?? 0) -
+                        (result['total_amount'] as num),
+                  );
+              value['currency'] = 'USD';
+              await _saveWallet(account, value, tx);
+            }
+            if (path == '/reservations') {
+              await store.write(account, '/cart', {
+                'items': [],
+                'total_items': 0,
+                'total_amount': 0,
+              }, tx: tx);
             }
             if (path.startsWith('/reservations')) {
               final reservation = result['reservation'] ?? result;

@@ -367,6 +367,11 @@ class ComprobantePagoDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                     ],
+                    if (reservation.deliveryFee > 0)
+                      Text(
+                        'Envío: USD ${reservation.deliveryFee.toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     // Financial Summary
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -464,7 +469,11 @@ class ComprobantePagoDialog extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} y presente su código ${reservation.reservationCode} para retirar sus prendas inmediatamente.',
+                              reservation.delivery != null &&
+                                      reservation.delivery!['status'] !=
+                                          'REJECTED'
+                                  ? 'Prendas y envío pagados. Sigue el estado del delivery en Mis Reservas. Código ${reservation.reservationCode}.'
+                                  : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} y presente su código ${reservation.reservationCode} para retirar sus prendas inmediatamente.',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,

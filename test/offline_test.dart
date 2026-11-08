@@ -232,16 +232,18 @@ void main() {
       expect((await offline.cached('/notifications'))[0]['is_read'], isTrue);
     },
   );
-  test('offline PayPal is pending and cannot be marked paid', () async {
-    final result = await offline.mutate('POST', '/reservations', {
-      'branch_id': 'b1',
-      'payment_method': 'PAYPAL',
-      'items': [
-        {'variant_id': 'v1', 'quantity': 1},
-      ],
-    });
-    expect(result['status'], 'SYNC_PENDING');
-    expect(result['payment_status'], 'PENDING');
+  test('new PayPal payments cannot be queued offline', () async {
+    await expectLater(
+      offline.mutate('POST', '/reservations', {
+        'branch_id': 'b1',
+        'payment_method': 'PAYPAL',
+        'items': [
+          {'variant_id': 'v1', 'quantity': 1},
+        ],
+      }),
+      throwsA(isA<ApiException>()),
+    );
+    expect(offline.pendingCount, 0);
     expect(sent, isEmpty);
   });
   test('dependent cancellation resolves local reservation ID', () async {
