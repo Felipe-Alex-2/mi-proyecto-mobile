@@ -14,7 +14,11 @@ class EstadoSinConexion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sync = context.watch<SinConexionService>();
-    final show = sync.offline || sync.pendingCount > 0 || sync.needsLogin;
+    final show =
+        sync.offline ||
+        sync.serverUnavailable ||
+        sync.pendingCount > 0 ||
+        sync.needsLogin;
     return Column(
       children: [
         if (show)
@@ -51,6 +55,8 @@ class EstadoSinConexion extends StatelessWidget {
                               ? 'Vuelve a iniciar sesión para sincronizar'
                               : '${sync.offline
                                     ? "Modo offline · datos guardados"
+                                    : sync.serverUnavailable
+                                    ? "Servidor temporalmente no disponible"
                                     : sync.syncing
                                     ? "Sincronizando…"
                                     : "Cambios pendientes"} · ${sync.pendingCount} pendiente(s)',

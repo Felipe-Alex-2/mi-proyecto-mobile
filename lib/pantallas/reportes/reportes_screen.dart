@@ -67,6 +67,7 @@ class ReportesScreen extends StatefulWidget {
 
 class _ReportesScreenState extends State<ReportesScreen> {
   final _transcript = TextEditingController();
+  final _email = TextEditingController();
   final _search = TextEditingController();
   final _threshold = TextEditingController(text: '5');
   final _from = TextEditingController();
@@ -109,6 +110,7 @@ class _ReportesScreenState extends State<ReportesScreen> {
   Future<void> _load() async {
     final user = context.read<AutenticacionService>().currentUser!;
     setState(() {
+      _email.text = user.email;
       _global = true;
       _ai = user.isSaasAdmin;
       _branch = '';
@@ -137,6 +139,10 @@ class _ReportesScreenState extends State<ReportesScreen> {
 
   Future<void> _generate({bool voice = false}) async {
     if (_busy) return;
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.text.trim())) {
+      setState(() => _error = 'Escribe un correo válido para enviar el PDF.');
+      return;
+    }
     _stopReading();
     setState(() {
       _busy = true;
@@ -147,7 +153,7 @@ class _ReportesScreenState extends State<ReportesScreen> {
       final api = context.read<ApiService>();
       final body = <String, dynamic>{
         'all_companies': _global,
-        'email_self': true,
+        'email_to': _email.text.trim(),
         if (!_global && _branch.isNotEmpty) 'branch_id': _branch,
       };
       if (voice) {
@@ -277,11 +283,18 @@ class _ReportesScreenState extends State<ReportesScreen> {
   Future<void> _retryEmail() async {
     final id = _report?['report_id'];
     if (id == null || _busy) return;
-    setState(() => _busy = true);
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.text.trim())) {
+      setState(() => _error = 'Escribe un correo válido para enviar el PDF.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final value = await context.read<ApiService>().postOnline(
         '/reports/$id/email',
-        body: {'email_self': true},
+        body: {'email_to': _email.text.trim()},
       );
       if (mounted) setState(() => _report = Map<String, dynamic>.from(value));
     } catch (e) {
@@ -295,7 +308,7 @@ class _ReportesScreenState extends State<ReportesScreen> {
   void dispose() {
     _tts.stop();
     _speech.cancel();
-    for (final c in [_transcript, _search, _threshold, _from, _to]) {
+    for (final c in [_transcript, _search, _threshold, _from, _to, _email]) {
       c.dispose();
     }
     super.dispose();
@@ -303,7 +316,6 @@ class _ReportesScreenState extends State<ReportesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AutenticacionService>().currentUser!;
     final current = _report;
     return Scaffold(
       appBar: AppBar(title: const Text('Reportes empresariales')),
@@ -319,9 +331,25 @@ class _ReportesScreenState extends State<ReportesScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ),
-          Text(
-            'El PDF se envía automáticamente a ${user.email}.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Gmail / correo de destino',
+              hintText: 'nombre@gmail.com',
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _busy || current?['report_id'] == null
+                ? null
+                : _retryEmail,
+            icon: const Icon(Icons.mail_outline),
+            label: const Text('Mandar al Gmail'),
+          ),
+          const Text(
+            'Puedes cambiar el correo. Al generar se envía el PDF a esta dirección.',
           ),
           const SizedBox(height: 16),
           SwitchListTile(
@@ -486,7 +514,7 @@ class _ReportesScreenState extends State<ReportesScreen> {
             if (current['email_status'] == 'FAILED')
               TextButton(
                 onPressed: _busy ? null : _retryEmail,
-                child: const Text('Reintentar envío del PDF a mi correo'),
+                child: const Text('Reintentar envío al Gmail indicado'),
               ),
             Wrap(
               spacing: 8,

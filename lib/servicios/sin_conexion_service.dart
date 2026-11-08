@@ -8,6 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 
 import 'api_service.dart';
+import 'conexion_internet.dart';
 import 'almacen_sin_conexion.dart';
 import 'sincronizacion_segundo_plano.dart';
 
@@ -24,6 +25,12 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   final OnlineSender send;
   String? owner;
   bool offline = false;
+  bool serverUnavailable = false;
+  bool _foreground = true;
+  bool _disposed = false;
+  Timer? _connectionDebounce;
+  Future<bool>? _connectionTask;
+  final Future<bool> Function() internetCheck;
   bool syncing = false;
   bool needsLogin = false;
   int revision = 0;
@@ -32,7 +39,11 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _timer;
   Future<void>? _syncTask;
   Future<void> _mutationTail = Future.value();
-  SinConexionService(this.store, this.send);
+  SinConexionService(
+    this.store,
+    this.send, {
+    this.internetCheck = internetDisponible,
+  });
   int get pendingCount => operations.length;
   bool get hasFailures => operations.any((r) => r['state'] == 'blocked');
 
@@ -41,21 +52,62 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     final connectivity = Connectivity();
     _connection = connectivity.onConnectivityChanged.listen(_connectivity);
     connectivity.checkConnectivity().then(_connectivity).catchError((_) {});
-    _timer = Timer.periodic(
-      const Duration(seconds: 20),
-      (_) => unawaited(sync()),
-    );
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (_foreground) unawaited(sync());
+    });
   }
 
   void _connectivity(List<ConnectivityResult> results) {
-    offline = results.every((r) => r == ConnectivityResult.none);
-    notifyListeners();
-    if (!offline) unawaited(sync());
+    if (!_foreground || _disposed) return;
+    _connectionDebounce?.cancel();
+    _connectionDebounce = Timer(const Duration(milliseconds: 600), () async {
+      if (await refreshConnection() && !_disposed) unawaited(sync());
+    });
+  }
+
+  Future<bool> refreshConnection() => _connectionTask ??= _checkConnection()
+      .whenComplete(() => _connectionTask = null);
+
+  Future<bool> _checkConnection() async {
+    bool available;
+    try {
+      available = await internetCheck();
+    } catch (_) {
+      available = !offline;
+    }
+    if (!_disposed && _foreground) {
+      offline = !available;
+      notifyListeners();
+    }
+    return available;
+  }
+
+  Future<void> checkAfterFailure(ApiException error) async {
+    if (!_foreground || _disposed) return;
+    if (error.statusCode >= 500) {
+      // The server responded; the internet is working.
+      offline = false;
+      serverUnavailable = true;
+      notifyListeners();
+      return;
+    }
+    final available = await refreshConnection();
+    if (!_disposed && _foreground) {
+      serverUnavailable = available;
+      notifyListeners();
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(sync());
+    _foreground = state == AppLifecycleState.resumed;
+    _connectionDebounce?.cancel();
+    if (_foreground) {
+      // Give the OS time to restore suspended network sockets before checking.
+      _connectionDebounce = Timer(const Duration(milliseconds: 600), () async {
+        if (await refreshConnection() && !_disposed) unawaited(sync());
+      });
+    }
   }
 
   Future<void> activate(String key) async {
@@ -108,13 +160,13 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         throw ApiException('La sesión cambió', statusCode: 401);
       }
       offline = false;
+      serverUnavailable = false;
       await store.write(account, path, base);
     } on ApiException catch (e) {
       if (e.statusCode != 0 && e.statusCode != 408 && e.statusCode < 500) {
         rethrow;
       }
-      offline = true;
-      notifyListeners();
+      if (!offline) await checkAfterFailure(e);
       base = await store.read(account, path);
       if (base == null && path.startsWith('/products/')) {
         final products = await store.read(account, '/products') as List? ?? [];
@@ -132,6 +184,12 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
         base = [];
       }
       if (base == null && path == '/virtual-fitting/profile') base = {};
+      if (base == null && !offline) {
+        throw ApiException(
+          'El servidor no está disponible. Reintenta en un momento.',
+          statusCode: e.statusCode,
+        );
+      }
       if (base == null) {
         throw ApiException(
           'Sin conexión. Abre esta sección con internet una vez para guardarla en el dispositivo.',
@@ -500,7 +558,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _drain() async {
     final activeOwner = owner;
-    if (activeOwner == null) return;
+    if (activeOwner == null || !_foreground || _disposed) return;
     final rows = await store.db.query(
       'outbox',
       columns: ['owner'],
@@ -514,21 +572,28 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
           .where((key) => _sameAccount(key, activeOwner)),
     };
     for (final account in owners) {
-      if (owner != activeOwner || needsLogin) break;
+      if (owner != activeOwner || needsLogin || !_foreground || _disposed) {
+        break;
+      }
       await _drainContext(account, activeOwner);
     }
   }
 
   Future<void> _drainContext(String account, String activeOwner) async {
     if (needsLogin) return;
-    if (offline) {
+    if (offline || serverUnavailable) {
       try {
         await send('GET', '/users/me', {});
         offline = false;
+        serverUnavailable = false;
       } on ApiException catch (e) {
         if (e.statusCode == 401) {
           needsLogin = true;
           notifyListeners();
+        } else if (e.statusCode == 0 ||
+            e.statusCode == 408 ||
+            e.statusCode >= 500) {
+          await checkAfterFailure(e);
         }
         return;
       } catch (_) {
@@ -539,7 +604,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     try {
       for (final row in await store.queue(account)) {
-        if (owner != activeOwner || needsLogin) break;
+        if (owner != activeOwner || needsLogin || !_foreground || _disposed) {
+          break;
+        }
         if (row['state'] == 'blocked') {
           break; // Strict FIFO: dependents never overtake a conflict.
         }
@@ -632,16 +699,17 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             );
           });
           offline = false;
+          serverUnavailable = false;
         } on ApiException catch (e) {
           if (e.statusCode == 401) {
             needsLogin = true;
             break;
           }
-          if (e.statusCode == 0 || e.statusCode == 408) {
-            offline = true;
+          if (e.statusCode == 0 || e.statusCode == 408 || e.statusCode >= 500) {
+            await checkAfterFailure(e);
             break;
           }
-          if (e.statusCode >= 500 || e.statusCode == 429) break;
+          if (e.statusCode == 429) break;
           await store.db.update(
             'outbox',
             {'state': 'blocked', 'error': e.message},
@@ -688,6 +756,8 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _disposed = true;
+    _connectionDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _connection?.cancel();

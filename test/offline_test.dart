@@ -148,7 +148,8 @@ void main() {
     String? first;
     var attempt = 0;
     offline.dispose();
-    offline = SinConexionService(store, (_, _, body) async {
+    offline = SinConexionService(store, (method, _, body) async {
+      if (method == 'GET') return {'id': 'u1'};
       if (attempt++ == 0) {
         first = body['operation_id'];
         throw ApiException('timeout', statusCode: 408);

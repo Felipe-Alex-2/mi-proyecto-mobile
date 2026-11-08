@@ -204,7 +204,7 @@ class AutenticacionService extends ChangeNotifier {
           rethrow;
         }
         if (_currentUser == null) rethrow;
-        if (offline != null) offline!.offline = true;
+        if (offline != null) await offline!.checkAfterFailure(e);
       }
       _status = AuthStatus.authenticated;
       _warmCache();

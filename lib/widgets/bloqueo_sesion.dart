@@ -5,12 +5,19 @@ import '../servicios/autenticacion_service.dart';
 class BloqueoSesion extends StatefulWidget {
   final AutenticacionService auth;
   final Widget child;
-  const BloqueoSesion({super.key, required this.auth, required this.child});
+  final DateTime Function()? now;
+  const BloqueoSesion({
+    super.key,
+    required this.auth,
+    required this.child,
+    this.now,
+  });
   @override
   State<BloqueoSesion> createState() => _BloqueoSesionState();
 }
 
-class _BloqueoSesionState extends State<BloqueoSesion> with WidgetsBindingObserver {
+class _BloqueoSesionState extends State<BloqueoSesion>
+    with WidgetsBindingObserver {
   DateTime? _background;
   @override
   void initState() {
@@ -26,10 +33,12 @@ class _BloqueoSesionState extends State<BloqueoSesion> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) _background = DateTime.now();
+    if (state == AppLifecycleState.paused) {
+      _background = (widget.now ?? DateTime.now)();
+    }
     if (state == AppLifecycleState.resumed && _background != null) {
-      if (DateTime.now().difference(_background!) >=
-          const Duration(seconds: 30)) {
+      if ((widget.now ?? DateTime.now)().difference(_background!) >
+          const Duration(minutes: 5)) {
         widget.auth.lock();
       }
       _background = null;

@@ -69,6 +69,7 @@ void main() {
       final offline = SinConexionService(
         store,
         (method, path, body) => api.sendOnline(method, path, body),
+        internetCheck: () async => connected,
       )..offline = true;
       api.offline = offline;
       final auth = AutenticacionService(api, storage, offline: offline);

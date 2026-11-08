@@ -164,8 +164,8 @@ void main() {
       await tester.tap(find.text('Generar reporte'));
       await tester.pumpAndSettle();
       expect(request?['all_companies'], isTrue);
-      expect(request?['email_self'], isTrue);
-      expect(request?.containsKey('email_to'), isFalse);
+      expect(request?['email_to'], 'admin@gmail.com');
+      expect(request?['email_to'], 'admin@gmail.com');
       await tester.scrollUntilVisible(
         find.text('PDF enviado a admin@gmail.com'),
         250,
@@ -173,6 +173,21 @@ void main() {
       );
       expect(find.text('Exportar CSV'), findsOneWidget);
       expect(find.text('Leer reporte'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Gmail / correo de destino'),
+        -300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Gmail / correo de destino'),
+        'otro@gmail.com',
+      );
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Mandar al Gmail'));
+      await tester.tap(find.text('Mandar al Gmail'));
+      await tester.pumpAndSettle();
+      expect(request?['email_to'], 'otro@gmail.com');
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
@@ -264,7 +279,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(body?['branch_id'], isNull);
       expect(body?['all_companies'], isTrue);
-      expect(body?['email_self'], isTrue);
+      expect(body?['email_to'], 'admin@gmail.com');
       await tester.tap(find.byType(SwitchListTile));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('branch_')));
