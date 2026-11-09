@@ -140,9 +140,7 @@ void main() {
                         ? 'PAID'
                         : 'PENDING',
                     'payment_method': body['payment_method'],
-                    'total_amount': body['fulfillment'] == 'DELIVERY'
-                        ? 13.44
-                        : 12,
+                    'total_amount': 12,
                     'delivery': body['fulfillment'] == 'DELIVERY'
                         ? {'status': 'REQUESTED'}
                         : null,
@@ -213,12 +211,7 @@ void main() {
       await tester.pumpAndSettle();
       await tapText('Delivery a domicilio');
       expect(find.byType(OpcionesEntrega), findsOneWidget);
-      expect(
-        tester
-            .widget<ElevatedButton>(button('Calcula el envío para continuar'))
-            .onPressed,
-        isNull,
-      );
+      expect(find.text('Calcular envío y tiempo'), findsNothing);
       await tapText('Pagar con mi wallet');
       expect(find.byType(OpcionesEntrega), findsNothing);
       expect(
@@ -239,15 +232,14 @@ void main() {
         field('Link de Google Maps'),
         'https://maps.app.goo.gl/cXzSxikcRGXvG7cU8',
       );
-      await tapText('Calcular envío y tiempo');
-      expect(quoteCalls, 1);
+      expect(quoteCalls, 0);
       final deliveryMethod = find.byType(DropdownButtonFormField<String>).last;
       await tester.ensureVisible(deliveryMethod);
       await tester.tap(deliveryMethod);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mi wallet').last);
       await tester.pumpAndSettle();
-      final pay = button('Pagar con wallet (\$ 13.44)');
+      final pay = button('Pagar prendas con wallet (\$ 12.00)');
       expect(tester.widget<ElevatedButton>(pay).onPressed, isNotNull);
       await tester.ensureVisible(pay);
       await tester.pumpAndSettle();
@@ -265,7 +257,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(requests.last, containsPair('fulfillment', 'DELIVERY'));
       expect(requests.last['payment_method'], 'WALLET');
-      expect(requests.last['delivery_quote_id'], 'quote');
+      expect(
+        requests.last['delivery_maps_url'],
+        'https://maps.app.goo.gl/cXzSxikcRGXvG7cU8',
+      );
+      expect(requests.last.containsKey('delivery_quote_id'), isFalse);
+      expect(quoteCalls, 0);
       expect(requests.last['branch_id'], 'selected');
       expect(requests.last['delivery_recipient'], 'Felipe Cliente');
       expect(requests.last['delivery_phone'], '70001234');

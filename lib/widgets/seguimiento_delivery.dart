@@ -7,9 +7,9 @@ class SeguimientoDelivery extends StatelessWidget {
   static const labels = {
     'AWAITING_PAYMENT': 'Pendiente de pago',
     'REQUESTED': 'Esperando aceptación de la sucursal',
-    'ACCEPTED': 'Aceptado · preparando tu pedido',
+    'ACCEPTED': 'Pedido aceptado y apartado',
     'REJECTED': 'Disponible para recoger en sucursal',
-    'OUT_FOR_DELIVERY': 'Tu delivery salió · en camino',
+    'OUT_FOR_DELIVERY': 'La moto salió con tu pedido',
     'DELIVERED': 'Entregado',
     'FAILED': 'No se pudo entregar',
   };
@@ -33,31 +33,46 @@ class SeguimientoDelivery extends StatelessWidget {
           ),
           Text('${delivery['recipient']} · ${delivery['phone']}'),
           Text('${delivery['address']}'),
-          Text(
-            'Envío pagado: USD ${(delivery['fee_usd'] as num).toStringAsFixed(2)} · ${delivery['distance_km']} km',
-          ),
-          if (delivery['status'] == 'REJECTED')
+          if (delivery['fee_usd'] == null)
             const Text(
-              'Tus prendas siguen pagadas para retirar. El costo del envío se devolvió a tu wallet.',
+              'El costo del envío se calculará en la sucursal al confirmar la salida de la moto.',
+            )
+          else
+            Text(
+              delivery['fee_collection'] == 'CASH_ON_DELIVERY'
+                  ? 'Envío: USD ${(delivery['fee_usd'] as num).toStringAsFixed(2)} · ${delivery['shipping_payment_status'] == 'PAID' ? 'Cobrado en efectivo' : 'Pagar en efectivo al recibir'}'
+                  : 'Envío pagado: USD ${(delivery['fee_usd'] as num).toStringAsFixed(2)}',
             ),
-          if (delivery['status'] == 'REQUESTED' ||
-              delivery['status'] == 'ACCEPTED')
+          if (delivery['status'] == 'REJECTED')
+            Text(
+              delivery['fee_collection'] == 'CASH_ON_DELIVERY'
+                  ? 'Tus prendas siguen pagadas para retirar en sucursal.'
+                  : 'Tus prendas siguen pagadas para retirar. El costo del envío se devolvió a tu wallet.',
+            ),
+          if (delivery['estimated_minutes_min'] != null &&
+              (delivery['status'] == 'REQUESTED' ||
+                  delivery['status'] == 'ACCEPTED'))
             Text(
               'Llegada estimada: ${delivery['estimated_minutes_min']}–${delivery['estimated_minutes_max']} min desde la aceptación. Puede variar por tráfico.',
             ),
           if (delivery['departed_at'] != null)
             Text(
-              'Salida: ${date(delivery['departed_at'])}\nLlegada aproximada: ${date(delivery['estimated_arrival_at'])}',
+              'Salida: ${date(delivery['departed_at'])}\n${delivery['estimated_arrival_at'] != null ? 'Llegada aproximada: ${date(delivery['estimated_arrival_at'])}' : 'Tiempo de llegada pendiente de confirmar'}',
             ),
           if ('${delivery['courier'] ?? ''}'.isNotEmpty)
             Text('Repartidor: ${delivery['courier']}'),
-          TextButton(
-            onPressed: () => launchUrl(
-              Uri.parse(delivery['directions_url']),
-              mode: LaunchMode.externalApplication,
+          if (delivery['directions_url'] != null ||
+              delivery['destination_maps_url'] != null)
+            TextButton(
+              onPressed: () => launchUrl(
+                Uri.parse(
+                  delivery['directions_url'] ??
+                      delivery['destination_maps_url'],
+                ),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: const Text('Ver ruta de entrega'),
             ),
-            child: const Text('Ver ruta de entrega'),
-          ),
           ExpansionTile(
             title: const Text('Seguimiento'),
             children: [

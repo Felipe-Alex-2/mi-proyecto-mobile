@@ -135,9 +135,6 @@ class _CarritoScreenState extends State<CarritoScreen> {
             final payWithWallet =
                 selectedPaymentMethod == 'WALLET' ||
                 (isDelivery && deliveryPaymentMethod == 'WALLET');
-            final deliveryFee = isDelivery
-                ? deliveryKey.currentState?.fee ?? 0
-                : 0;
             final isWallet = selectedPaymentMethod == 'WALLET';
             final selectedBranch = branches.firstWhere(
               (b) => b.id == selectedBranchId,
@@ -177,7 +174,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Prendas: ${cart.totalItems} | Total: \$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)}',
+                    'Prendas: ${cart.totalItems} | Total: \$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: TemaApp.brownMedium,
                       fontSize: 13,
@@ -239,7 +236,6 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             if (val != null) {
                               setSheetState(() {
                                 selectedBranchId = val;
-                                deliveryKey.currentState?.clearQuote();
                                 appliedCoupon = null;
                                 couponTotal = null;
                                 couponSavings = null;
@@ -518,7 +514,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         ),
                         title: const Text('Delivery a domicilio'),
                         subtitle: const Text(
-                          'Recibe tus prendas. Calcula el envío y paga con PayPal o wallet.',
+                          'Envía los datos de entrega y paga las prendas con PayPal o wallet.',
                         ),
                         onTap: isSubmitting || checkingCoupon || isOffline
                             ? null
@@ -538,7 +534,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                       initialValue: deliveryPaymentMethod,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Pagar prendas y envío con',
+                        labelText: 'Pagar prendas con',
                       ),
                       items: const [
                         DropdownMenuItem(
@@ -629,21 +625,11 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ],
                   const SizedBox(height: 18),
 
-                  if (deliveryFee > 0)
-                    Text(
-                      'Total con envío: USD ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
                   // Submit Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          isSubmitting ||
-                              checkingCoupon ||
-                              (isDelivery &&
-                                  !(deliveryKey.currentState?.quoteReady ??
-                                      false))
+                      onPressed: isSubmitting || checkingCoupon
                           ? null
                           : () async {
                               if (couponController.text.trim().isNotEmpty &&
@@ -791,14 +777,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               ),
                             )
                           : Text(
-                              isDelivery &&
-                                      !(deliveryKey.currentState?.quoteReady ??
-                                          false)
-                                  ? 'Calcula el envío para continuar'
-                                  : payWithPayPal
-                                  ? 'Pagar con PayPal (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
+                              payWithPayPal
+                                  ? '${isDelivery ? 'Pagar prendas con PayPal' : 'Pagar con PayPal'} (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
                                   : payWithWallet
-                                  ? 'Pagar con wallet (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
+                                  ? '${isDelivery ? 'Pagar prendas con wallet' : 'Pagar con wallet'} (\$ ${(couponTotal ?? cart.totalAmount).toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -1140,7 +1122,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             : paid
                             ? r.delivery != null &&
                                       r.delivery!['status'] != 'REJECTED'
-                                  ? 'Prendas y envío pagados. La sucursal debe aceptar el delivery. Consulta su seguimiento en Reservas.'
+                                  ? 'Prendas pagadas. Tu solicitud está a la espera de aceptación. Te avisaremos cuando salga la moto; el envío se paga en efectivo al recibir.'
                                   : 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                             : 'Presenta este código en la sucursal ${r.branchName ?? "seleccionada"} para que el personal prepare tus prendas para prueba y pago en caja.',
                         style: TextStyle(

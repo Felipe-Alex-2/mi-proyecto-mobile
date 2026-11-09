@@ -472,7 +472,7 @@ class ComprobantePagoDialog extends StatelessWidget {
                               reservation.delivery != null &&
                                       reservation.delivery!['status'] !=
                                           'REJECTED'
-                                  ? 'Prendas y envío pagados. Sigue el estado del delivery en Mis Reservas. Código ${reservation.reservationCode}.'
+                                  ? 'Consulta la aceptación y salida de tu delivery en Mis Reservas. Código ${reservation.reservationCode}.'
                                   : 'Pase por la sucursal ${reservation.branchName ?? "seleccionada"} y presente su código ${reservation.reservationCode} para retirar sus prendas inmediatamente.',
                               style: const TextStyle(
                                 fontSize: 12,

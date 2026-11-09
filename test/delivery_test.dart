@@ -51,7 +51,7 @@ void main() {
     }
   });
   testWidgets(
-    'delivery prefills contact, quotes in USD and invalidates an edited destination',
+    'delivery sends contact and Maps link without asking the customer to quote',
     (tester) async {
       tester.view.physicalSize = const Size(390, 1100);
       tester.view.devicePixelRatio = 1;
@@ -125,19 +125,23 @@ void main() {
         fields.at(3),
         'https://www.google.com/maps?q=-17.8,-63.2',
       );
-      final calculate = find.text('Calcular envío y tiempo');
-      await tester.ensureVisible(calculate);
-      await tester.tap(calculate);
-      await tester.pumpAndSettle();
-      expect(calls, 1);
-      expect(key.currentState!.fee, 1.44);
+      expect(find.text('Calcular envío y tiempo'), findsNothing);
+      expect(calls, 0);
       expect(
         key.currentState!.validatedPayload(),
         containsPair('delivery_phone', '70001234'),
       );
-      expect(find.textContaining('Envío: USD 1.44'), findsOneWidget);
-      await tester.ensureVisible(find.textContaining('Envío: USD 1.44'));
-      await tester.pumpAndSettle();
+      expect(
+        key.currentState!.validatedPayload(),
+        containsPair(
+          'delivery_maps_url',
+          'https://www.google.com/maps?q=-17.8,-63.2',
+        ),
+      );
+      expect(
+        key.currentState!.validatedPayload()!.containsKey('delivery_quote_id'),
+        isFalse,
+      );
       await tester.runAsync(() async {
         final render =
             screenKey.currentContext!.findRenderObject()!
@@ -154,8 +158,11 @@ void main() {
         'https://www.google.com/maps?q=-17.9,-63.1',
       );
       await tester.pump();
-      expect(key.currentState!.fee, 0);
-      expect(() => key.currentState!.validatedPayload(), throwsException);
+      expect(
+        key.currentState!.validatedPayload()!['delivery_maps_url'],
+        'https://www.google.com/maps?q=-17.9,-63.1',
+      );
+      expect(calls, 0);
     },
   );
 
@@ -180,7 +187,7 @@ void main() {
             'items': [],
             'status': 'CONFIRMED',
             'total_amount': 51.44,
-            'delivery_fee': 1.44,
+            'delivery_fee': 0,
             'delivery': {'status': 'REQUESTED'},
           });
         }),
@@ -190,7 +197,7 @@ void main() {
       addTearDown(api.dispose);
       final delivery = {
         'fulfillment': 'DELIVERY',
-        'delivery_quote_id': 'quote',
+        'delivery_maps_url': 'https://maps.app.goo.gl/example',
         'delivery_recipient': 'Felipe',
         'delivery_phone': '70001234',
         'delivery_address': 'Calle 123',
@@ -204,7 +211,7 @@ void main() {
         idempotencyKey: 'request',
         delivery: delivery,
       );
-      expect(result.deliveryFee, 1.44);
+      expect(result.deliveryFee, 0);
       expect(result.delivery!['status'], 'REQUESTED');
       await service.createPayPalReservationOrder(
         branchId: 'branch',
@@ -215,7 +222,7 @@ void main() {
       );
       expect(requests.map((r) => r['payment_method']), ['WALLET', 'PAYPAL']);
       for (final body in requests) {
-        expect(body['delivery_quote_id'], 'quote');
+        expect(body['delivery_maps_url'], 'https://maps.app.goo.gl/example');
         expect(body['fulfillment'], 'DELIVERY');
       }
     },
