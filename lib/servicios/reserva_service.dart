@@ -79,7 +79,9 @@ class ReservaService extends SesionNotifier {
             paymentMethod == 'PAYPAL' ||
             (couponCode?.isNotEmpty ?? false))) {
       throw ApiException(
-        'PayPal y la validación de cupones necesitan Internet.',
+        delivery != null
+            ? 'Delivery necesita Internet para confirmar la ruta y el pago.'
+            : 'PayPal y la validación de cupones necesitan Internet.',
         statusCode: 422,
       );
     }
@@ -199,6 +201,10 @@ class ReservaService extends SesionNotifier {
   }
 
   Future<List<SucursalOption>> getActiveBranches() async {
+    List<SucursalOption> scoped(List<SucursalOption> rows) =>
+        _apiService.activeBranchId == null
+        ? rows
+        : rows.where((b) => b.id == _apiService.activeBranchId).toList();
     // 1. Intentar directamente desde /branches?is_active=true
     try {
       final data = await _apiService.get('/branches?is_active=true');
@@ -206,7 +212,7 @@ class ReservaService extends SesionNotifier {
         final list = data
             .map((b) => SucursalOption.fromJson(b as Map<String, dynamic>))
             .toList();
-        if (list.isNotEmpty) return list;
+        if (list.isNotEmpty) return scoped(list);
       }
     } catch (e) {
       debugPrint('Error loading active branches from /branches: $e');
@@ -219,7 +225,7 @@ class ReservaService extends SesionNotifier {
       final list = branchesJson
           .map((b) => SucursalOption.fromJson(b as Map<String, dynamic>))
           .toList();
-      if (list.isNotEmpty) return list;
+      if (list.isNotEmpty) return scoped(list);
     } catch (e) {
       debugPrint('Error loading active branches from /catalog/filters: $e');
     }

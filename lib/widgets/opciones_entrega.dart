@@ -9,11 +9,13 @@ class OpcionesEntrega extends StatefulWidget {
   final String branchId;
   final bool enabled;
   final VoidCallback onChanged;
+  final bool deliveryOnly;
   const OpcionesEntrega({
     super.key,
     required this.branchId,
     required this.enabled,
     required this.onChanged,
+    this.deliveryOnly = false,
   });
   @override
   State<OpcionesEntrega> createState() => OpcionesEntregaState();
@@ -31,6 +33,7 @@ class OpcionesEntregaState extends State<OpcionesEntrega> {
   @override
   void initState() {
     super.initState();
+    delivery = widget.deliveryOnly;
     final user = context.read<AutenticacionService>().currentUser;
     name.text = user?.fullName ?? '';
     phone.text = user?.phone ?? '';
@@ -59,6 +62,11 @@ class OpcionesEntregaState extends State<OpcionesEntrega> {
   }
 
   double get fee => delivery ? (quote?['fee_usd'] as num?)?.toDouble() ?? 0 : 0;
+  bool get quoteReady {
+    final expiry = DateTime.tryParse('${quote?['expires_at']}');
+    return quote != null && expiry != null && expiry.isAfter(DateTime.now());
+  }
+
   Map<String, dynamic>? validatedPayload() {
     if (!delivery) return null;
     if (!(form.currentState?.validate() ?? false)) {
@@ -118,34 +126,37 @@ class OpcionesEntregaState extends State<OpcionesEntrega> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 16),
-          const Text(
-            '3. ¿Cómo recibes tu compra?',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Text(
+            widget.deliveryOnly
+                ? 'Datos para el delivery'
+                : '3. ¿Cómo recibes tu compra?',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          DropdownButtonFormField<bool>(
-            isExpanded: true,
-            initialValue: delivery,
-            decoration: const InputDecoration(labelText: 'Entrega'),
-            items: const [
-              DropdownMenuItem(
-                value: false,
-                child: Text('Pasar a recoger en sucursal'),
-              ),
-              DropdownMenuItem(
-                value: true,
-                child: Text('Delivery a mi ubicación'),
-              ),
-            ],
-            onChanged: !widget.enabled || loading
-                ? null
-                : (value) {
-                    setState(() {
-                      delivery = value ?? false;
-                      error = null;
-                    });
-                    widget.onChanged();
-                  },
-          ),
+          if (!widget.deliveryOnly)
+            DropdownButtonFormField<bool>(
+              isExpanded: true,
+              initialValue: delivery,
+              decoration: const InputDecoration(labelText: 'Entrega'),
+              items: const [
+                DropdownMenuItem(
+                  value: false,
+                  child: Text('Pasar a recoger en sucursal'),
+                ),
+                DropdownMenuItem(
+                  value: true,
+                  child: Text('Delivery a mi ubicación'),
+                ),
+              ],
+              onChanged: !widget.enabled || loading
+                  ? null
+                  : (value) {
+                      setState(() {
+                        delivery = value ?? false;
+                        error = null;
+                      });
+                      widget.onChanged();
+                    },
+            ),
           if (delivery) ...[
             if (offline)
               const Text(

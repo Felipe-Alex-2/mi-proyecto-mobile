@@ -70,13 +70,23 @@ class _CarritoScreenState extends State<CarritoScreen> {
     final cartService = context.read<CarritoService>();
 
     // Load active branches
-    final branches = await resService.getActiveBranches();
+    final activeBranches = await resService.getActiveBranches();
+    if (!context.mounted) return;
+    final user = context.read<AutenticacionService>().currentUser;
+    final checkoutBranch = user?.role == 'CUSTOMER'
+        ? context.read<ApiService>().activeBranchId ?? user?.branchId
+        : null;
+    final branches = checkoutBranch == null
+        ? activeBranches
+        : activeBranches.where((b) => b.id == checkoutBranch).toList();
     if (!context.mounted) return;
 
     if (branches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay sucursales disponibles en este momento'),
+          content: Text(
+            'La sucursal de tu compra no está disponible. Selecciona una tienda activa y actualiza tu carrito.',
+          ),
         ),
       );
       return;
@@ -97,6 +107,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
     String selectedPaymentMethod = isOffline && initialPaymentMethod == 'PAYPAL'
         ? 'EFECTIVO'
         : initialPaymentMethod; // 'PAYPAL' or 'EFECTIVO'
+    String deliveryPaymentMethod = 'PAYPAL';
     final deliveryKey = GlobalKey<OpcionesEntregaState>();
     final notesController = TextEditingController();
     final couponController = TextEditingController();
@@ -118,7 +129,13 @@ class _CarritoScreenState extends State<CarritoScreen> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final isPayPal = selectedPaymentMethod == 'PAYPAL';
-            final deliveryFee = selectedPaymentMethod != 'EFECTIVO'
+            final isDelivery = selectedPaymentMethod == 'DELIVERY';
+            final payWithPayPal =
+                isPayPal || (isDelivery && deliveryPaymentMethod == 'PAYPAL');
+            final payWithWallet =
+                selectedPaymentMethod == 'WALLET' ||
+                (isDelivery && deliveryPaymentMethod == 'WALLET');
+            final deliveryFee = isDelivery
                 ? deliveryKey.currentState?.fee ?? 0
                 : 0;
             final isWallet = selectedPaymentMethod == 'WALLET';
@@ -185,7 +202,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   const SizedBox(height: 12),
                   // Branch selector
                   const Text(
-                    '1. Selecciona la sucursal de retiro *',
+                    '1. Sucursal de tu compra *',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -319,11 +336,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                     ),
                   // PayPal Option
                   InkWell(
-                    onTap: isOffline
+                    onTap: isOffline || isSubmitting || checkingCoupon
                         ? null
                         : () {
                             setSheetState(() {
                               selectedPaymentMethod = 'PAYPAL';
+                              sheetError = null;
                             });
                           },
                     borderRadius: BorderRadius.circular(12),
@@ -377,7 +395,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Paga en línea con tu cuenta Sandbox. Elige recoger en sucursal o solicitar delivery.',
+                                  'Paga en línea con tu cuenta Sandbox y recoge tus prendas en sucursal.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: TemaApp.brownMedium,
@@ -408,18 +426,22 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         ),
                         onTap: isSubmitting
                             ? null
-                            : () => setSheetState(
-                                () => selectedPaymentMethod = 'WALLET',
-                              ),
+                            : () => setSheetState(() {
+                                selectedPaymentMethod = 'WALLET';
+                                sheetError = null;
+                              }),
                       ),
                     ),
                   // In-Store / Cash Option
                   InkWell(
-                    onTap: () {
-                      setSheetState(() {
-                        selectedPaymentMethod = 'EFECTIVO';
-                      });
-                    },
+                    onTap: isSubmitting || checkingCoupon
+                        ? null
+                        : () {
+                            setSheetState(() {
+                              selectedPaymentMethod = 'EFECTIVO';
+                              sheetError = null;
+                            });
+                          },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(12),
@@ -486,6 +508,67 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  if (canWallet) ...[
+                    Card(
+                      child: ListTile(
+                        leading: Icon(
+                          isDelivery
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                        ),
+                        title: const Text('Delivery a domicilio'),
+                        subtitle: const Text(
+                          'Recibe tus prendas. Calcula el envío y paga con PayPal o wallet.',
+                        ),
+                        onTap: isSubmitting || checkingCoupon || isOffline
+                            ? null
+                            : () => setSheetState(() {
+                                selectedPaymentMethod = 'DELIVERY';
+                                sheetError = null;
+                              }),
+                      ),
+                    ),
+                    if (isOffline)
+                      const Text(
+                        'Delivery necesita Internet para calcular la ruta y confirmar el pago.',
+                      ),
+                  ],
+                  if (isDelivery) ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: deliveryPaymentMethod,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Pagar prendas y envío con',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'PAYPAL',
+                          child: Text('PayPal Sandbox'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'WALLET',
+                          child: Text('Mi wallet'),
+                        ),
+                      ],
+                      onChanged: isSubmitting || checkingCoupon
+                          ? null
+                          : (value) => setSheetState(() {
+                              deliveryPaymentMethod = value ?? 'PAYPAL';
+                              sheetError = null;
+                            }),
+                    ),
+                    OpcionesEntrega(
+                      key: deliveryKey,
+                      branchId: selectedBranchId,
+                      deliveryOnly: true,
+                      enabled: !isSubmitting && !checkingCoupon,
+                      onChanged: () => setSheetState(() {
+                        sheetError = null;
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Notes
                   const Text(
                     'Comentarios o notas (Opcional)',
@@ -546,13 +629,6 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ],
                   const SizedBox(height: 18),
 
-                  if (isPayPal || isWallet)
-                    OpcionesEntrega(
-                      key: deliveryKey,
-                      branchId: selectedBranchId,
-                      enabled: !isSubmitting && !checkingCoupon,
-                      onChanged: () => setSheetState(() {}),
-                    ),
                   if (deliveryFee > 0)
                     Text(
                       'Total con envío: USD ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)}',
@@ -562,7 +638,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: isSubmitting || checkingCoupon
+                      onPressed:
+                          isSubmitting ||
+                              checkingCoupon ||
+                              (isDelivery &&
+                                  !(deliveryKey.currentState?.quoteReady ??
+                                      false))
                           ? null
                           : () async {
                               if (couponController.text.trim().isNotEmpty &&
@@ -577,7 +658,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 sheetError = null;
                               });
                               try {
-                                final deliveryPayload = (isPayPal || isWallet)
+                                final deliveryPayload = isDelivery
                                     ? deliveryKey.currentState
                                           ?.validatedPayload()
                                     : null;
@@ -590,7 +671,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                     )
                                     .toList();
 
-                                if (isPayPal) {
+                                if (payWithPayPal) {
                                   // PayPal flow
                                   final orderData = await resService
                                       .createPayPalReservationOrder(
@@ -634,7 +715,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   // Free store reservation flow
                                   final newRes = await resService
                                       .createReservation(
-                                        idempotencyKey: isWallet
+                                        idempotencyKey: payWithWallet
                                             ? _walletAttempts.putIfAbsent(
                                                 jsonEncode([
                                                   selectedBranchId,
@@ -652,7 +733,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                                 requestId,
                                               )
                                             : null,
-                                        paymentMethod: isWallet
+                                        paymentMethod: payWithWallet
                                             ? 'WALLET'
                                             : 'EFECTIVO',
                                         branchId: selectedBranchId,
@@ -694,7 +775,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                       icon: isSubmitting
                           ? const SizedBox.shrink()
                           : Icon(
-                              isPayPal
+                              payWithPayPal
                                   ? Icons.payment_rounded
                                   : Icons.check_circle_outline,
                               color: Colors.white,
@@ -710,9 +791,13 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               ),
                             )
                           : Text(
-                              isPayPal
+                              isDelivery &&
+                                      !(deliveryKey.currentState?.quoteReady ??
+                                          false)
+                                  ? 'Calcula el envío para continuar'
+                                  : payWithPayPal
                                   ? 'Pagar con PayPal (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
-                                  : isWallet
+                                  : payWithWallet
                                   ? 'Pagar con wallet (\$ ${((couponTotal ?? cart.totalAmount) + deliveryFee).toStringAsFixed(2)})'
                                   : 'Confirmar Reserva para Tienda',
                               style: const TextStyle(
@@ -722,7 +807,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               ),
                             ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isPayPal
+                        backgroundColor: payWithPayPal
                             ? const Color(0xFF0070BA)
                             : TemaApp.terracotta,
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1053,7 +1138,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   ? 'El total está descontado de tu saldo local disponible. El cobro y el stock se confirmarán al recuperar Internet.'
                                   : 'Se enviará al recuperar la conexión. Espera la confirmación de disponibilidad antes de acudir a la sucursal.')
                             : paid
-                            ? 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
+                            ? r.delivery != null &&
+                                      r.delivery!['status'] != 'REJECTED'
+                                  ? 'Prendas y envío pagados. La sucursal debe aceptar el delivery. Consulta su seguimiento en Reservas.'
+                                  : 'Pase por la sucursal ${r.branchName ?? "seleccionada"} a recoger sus prendas ya pagadas.'
                             : 'Presenta este código en la sucursal ${r.branchName ?? "seleccionada"} para que el personal prepare tus prendas para prueba y pago en caja.',
                         style: TextStyle(
                           color: paid
