@@ -114,6 +114,28 @@ class AsistenteLocalCatalogo {
     return null;
   }
 
+  String? faq(String message) {
+    final query = _normalize(message.trim());
+    if (RegExp(r'\b(wallet|paypal|sin internet|sin conexion|offline)\b')
+        .hasMatch(query)) {
+      return 'Sin conexión puedes agregar prendas del catálogo guardado al carrito y usar tu saldo wallet previamente descargado. El saldo se reserva en este celular y la compra queda pendiente hasta volver a Internet. El servidor confirmará saldo, precio y stock al sincronizar. PayPal y las recargas necesitan Internet.';
+    }
+    if (RegExp(r'\b(puntos|fidelizacion|cupon)\b').hasMatch(query)) {
+      return 'Por cada USD 10 gastados en prendas recibes 1 punto. Canjea 5 puntos por 7%, 7 por 10% o 10 por 15% de descuento. La caja misteriosa cuesta 10 puntos y se retira presencialmente.';
+    }
+    if (RegExp(r'\b(delivery|envio)\b').hasMatch(query)) {
+      return 'Para delivery envía tus datos y ubicación con Internet. La sucursal acepta el pedido y después confirma la salida de la moto; recibirás una notificación. El envío se paga en efectivo al recibirlo.';
+    }
+    if (RegExp(r'\b(cambio|cambios|devolucion|devoluciones)\b')
+        .hasMatch(query)) {
+      return 'Presenta el código del comprobante para solicitar el cambio dentro de las 48 horas desde su emisión. La prenda debe estar apta para venta y la sucursal comprobará las condiciones del cambio.';
+    }
+    if (RegExp(r'\b(mayor|mayoreo)\b').hasMatch(query)) {
+      return 'Desde 13 prendas se aplica automáticamente un 15% de descuento al total de las prendas. El porcentaje sigue siendo 15% aunque agregues más unidades.';
+    }
+    return null;
+  }
+
   RecomendacionResponse respond(String message, List<Producto> catalog) {
     final query = _normalize(message.trim());
     final filters = <String, String>{};
@@ -126,6 +148,9 @@ class AsistenteLocalCatalogo {
       matchedFilters: filters,
       recommendations: products,
     );
+
+    final answer = faq(message);
+    if (answer != null) return reply(answer);
 
     if (catalog.isEmpty) {
       return reply(
@@ -181,7 +206,7 @@ class AsistenteLocalCatalogo {
     ).hasMatch(query);
     if (filters.isEmpty && terms.isEmpty && !browse) {
       return reply(
-        'Mi modo local está limitado a buscar ropa del catálogo guardado. Dime una prenda, color, talla o presupuesto; no puedo responder preguntas generales.',
+        'Puedo buscar ropa del catálogo guardado y responder preguntas frecuentes de VESTA. Para conversar sobre moda, descarga el modelo local desde Carlitos.',
       );
     }
 

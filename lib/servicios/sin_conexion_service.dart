@@ -126,7 +126,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     final account = owner;
     final rows = account == null
         ? <Map<String, Object?>>[]
-        : (await store.db.query('outbox', orderBy: 'seq ASC'))
+        : (await store.queue())
               .where((row) => _sameAccount(row['owner'] as String, account))
               .toList();
     if (account != owner) return;
@@ -236,7 +236,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     String account,
     dynamic base,
   ) async {
-    final rows = await store.db.query('outbox');
+    final rows = await store.queue();
     final holds = rows
         .where(
           (r) =>
@@ -267,6 +267,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   ) async {
     final rows = await tx.query(
       'cache',
+      columns: ['owner'],
       where: 'path=?',
       whereArgs: ['/wallet'],
     );
@@ -288,7 +289,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     dynamic result = jsonDecode(jsonEncode(base));
     var pending = await store.queue(account);
     if (path == '/reservations') {
-      final rows = await store.db.query('outbox', orderBy: 'seq ASC');
+      final rows = await store.queue();
       pending = rows
           .where((r) => _sameAccount(r['owner'] as String, account))
           .toList();
@@ -821,14 +822,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
               await store.write(account, path, result, tx: tx);
             }
             if (path.startsWith('/notifications/')) {
-              final rows = await tx.query(
-                'cache',
-                where: 'owner=? AND path=?',
-                whereArgs: [account, '/notifications'],
-              );
-              if (rows.isNotEmpty) {
-                final notifications =
-                    jsonDecode(rows.first['data'] as String) as List;
+              final notifications =
+                  await store.read(account, '/notifications', tx: tx) as List?;
+              if (notifications != null) {
                 await store.write(
                   account,
                   '/notifications',
@@ -854,16 +850,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             if (path == '/reservations' &&
                 jsonDecode(row['body'] as String)['payment_method'] ==
                     'WALLET') {
-              final cached = await tx.query(
-                'cache',
-                where: 'owner=? AND path=?',
-                whereArgs: [account, '/wallet'],
+              final value = Map<String, dynamic>.from(
+                await store.read(account, '/wallet', tx: tx) ?? {},
               );
-              final value = cached.isEmpty
-                  ? <String, dynamic>{}
-                  : Map<String, dynamic>.from(
-                      jsonDecode(cached.first['data'] as String),
-                    );
               value['balance'] =
                   result['wallet_balance'] ??
                   max(
@@ -883,14 +872,9 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             }
             if (path.startsWith('/reservations')) {
               final reservation = result['reservation'] ?? result;
-              final rows = await tx.query(
-                'cache',
-                where: 'owner=? AND path=?',
-                whereArgs: [account, '/reservations'],
-              );
-              final list = rows.isEmpty
-                  ? <dynamic>[]
-                  : jsonDecode(rows.first['data'] as String) as List;
+              final list =
+                  await store.read(account, '/reservations', tx: tx) as List? ??
+                  <dynamic>[];
               list.removeWhere((r) => r['id'] == reservation['id']);
               list.insert(0, reservation);
               await store.write(account, '/reservations', list, tx: tx);

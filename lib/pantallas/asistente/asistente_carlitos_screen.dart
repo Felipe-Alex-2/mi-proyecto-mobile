@@ -7,6 +7,7 @@ import '../../modelos/recomendacion.dart';
 import '../../servicios/recomendacion_service.dart';
 import '../../servicios/api_service.dart';
 import '../../widgets/foto_producto.dart';
+import '../../widgets/descarga_carlitos.dart';
 import '../catalogo/detalle_producto_screen.dart';
 
 class AsistenteCarlitosScreen extends StatefulWidget {
@@ -54,6 +55,8 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
         (context.read<ApiService>().offline?.offline ?? false);
     final examples = localMode
         ? const [
+            'Me gusta el azul',
+            '¿Cómo pago sin Internet?',
             'Camisa azul talla M',
             'Pantalones hasta 200',
             'Muéstrame el catálogo',
@@ -66,11 +69,7 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Icon(
-              Icons.auto_awesome,
-              color: TemaApp.terracotta,
-              size: 20,
-            ),
+            const Icon(Icons.auto_awesome, color: TemaApp.terracotta, size: 20),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
@@ -104,6 +103,8 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            DescargaCarlitos(model: recommendationService.localModel),
+            const SizedBox(height: 12),
             // Encabezado principal
             Container(
               padding: const EdgeInsets.all(18),
@@ -230,7 +231,7 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
                     _buildStepRow(
                       number: '02',
                       title: 'Conexión o búsqueda local',
-                      subtitle: 'Con internet, la IA interpreta tus gustos. Offline, una búsqueda limitada filtra por prenda, color, talla y presupuesto.',
+                      subtitle: 'Con Internet consulto la IA. Sin conexión busco prendas, respondo preguntas frecuentes y, si descargaste el modelo, doy consejos de moda en este celular.',
                     ),
                     const SizedBox(height: 10),
                     _buildStepRow(
@@ -398,9 +399,7 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
                             color: TemaApp.terracotta.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: TemaApp.terracotta.withValues(
-                                alpha: 0.25,
-                              ),
+                              color: TemaApp.terracotta.withValues(alpha: 0.25),
                             ),
                           ),
                           child: Row(
@@ -444,7 +443,7 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  'Modo local · Esta respuesta se genera en el celular con una búsqueda limitada del catálogo guardado, sin IA generativa. Ejemplo: «camisa azul talla M hasta 200».',
+                  'Modo local · Consulto el catálogo guardado y preguntas frecuentes. Con el modelo descargado también puedo dar consejos de moda. Precios y stock se confirman al sincronizar.',
                   style: TextStyle(color: TemaApp.sageInk, fontSize: 13),
                 ),
               ),
@@ -789,9 +788,7 @@ class _AsistenteCarlitosScreenState extends State<AsistenteCarlitosScreen> {
         decoration: BoxDecoration(
           color: TemaApp.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: TemaApp.terracotta.withValues(alpha: 0.12),
-          ),
+          border: Border.all(color: TemaApp.terracotta.withValues(alpha: 0.12)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),

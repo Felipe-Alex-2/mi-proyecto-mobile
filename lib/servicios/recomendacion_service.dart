@@ -4,9 +4,12 @@ import '../modelos/recomendacion.dart';
 import '../modelos/producto.dart';
 import 'api_service.dart';
 import 'asistente_catalogo_local.dart';
+import 'carlitos_modelo_local.dart';
 
 class RecomendacionService extends SesionNotifier {
   final ApiService _api;
+
+  final CarlitosModeloLocal localModel = CarlitosModeloLocal();
 
   RecomendacionService(this._api);
 
@@ -31,10 +34,33 @@ class RecomendacionService extends SesionNotifier {
       );
     }
     final products = (cached as List? ?? [])
-        .map((item) => Producto.fromJson(Map<String, dynamic>.from(item as Map)))
+        .map(
+          (item) => Producto.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
         .toList();
     _isLocalResponse = true;
-    return AsistenteLocalCatalogo().respond(text, products);
+    final assistant = AsistenteLocalCatalogo();
+    final result = assistant.respond(text, products);
+    if (assistant.faq(text) == null &&
+        result.matchedFilters.isEmpty &&
+        result.recommendations.isEmpty) {
+      final answer = await localModel.answer(text);
+      if (owner != _api.offline?.owner) {
+        throw ApiException(
+          'La sesión cambió. Vuelve a iniciar sesión.',
+          statusCode: 401,
+        );
+      }
+      if (answer != null) {
+        return RecomendacionResponse(
+          message: 'Modelo local · $answer',
+          interpretation: result.interpretation,
+          matchedFilters: result.matchedFilters,
+          recommendations: result.recommendations,
+        );
+      }
+    }
+    return result;
   }
 
   Future<RecomendacionResponse?> getRecommendations(String message) async {
@@ -80,6 +106,12 @@ class RecomendacionService extends SesionNotifier {
       notifyListeners();
       return null;
     }
+  }
+
+  @override
+  void dispose() {
+    localModel.dispose();
+    super.dispose();
   }
 
   void clear() {

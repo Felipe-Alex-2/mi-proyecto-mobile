@@ -94,8 +94,29 @@ void main() {
     expect(engine.respond('hola', catalog).message, contains('¡Hola!'));
     final unsupported = engine.respond('quién es el presidente', catalog);
     expect(unsupported.recommendations, isEmpty);
-    expect(unsupported.message, contains('limitado'));
+    expect(unsupported.message, contains('modelo local'));
     expect(engine.respond('camisa', []).message, contains('conexión una vez'));
+  });
+
+  test('simple preference filters blue stock and FAQs work without a catalog or model', () {
+    final result = engine.respond('Me gusta el azul', catalog);
+    expect(result.matchedFilters['Color'], 'azul');
+    expect(result.recommendations.map((p) => p.id).toSet(), {
+      'blue',
+      'expensive',
+    });
+    expect(
+      engine.respond('¿Cómo pago sin Internet?', []).message,
+      contains('pendiente'),
+    );
+    expect(
+      engine.respond('¿Puedo usar PayPal offline?', []).message,
+      contains('necesitan Internet'),
+    );
+    expect(
+      engine.respond('¿Cuántos puntos necesito?', []).message,
+      contains('5 puntos'),
+    );
   });
 
   late AlmacenSinConexion store;
