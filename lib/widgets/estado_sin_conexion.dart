@@ -18,7 +18,9 @@ class EstadoSinConexion extends StatelessWidget {
         sync.offline ||
         sync.serverUnavailable ||
         sync.pendingCount > 0 ||
-        sync.needsLogin;
+        sync.needsLogin ||
+        sync.downloadingData ||
+        sync.downloadError != null;
     return Column(
       children: [
         if (show)
@@ -51,10 +53,14 @@ class EstadoSinConexion extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          sync.needsLogin
+                          sync.downloadingData
+                              ? 'Preparando datos offline… ${sync.downloadedSections}/${sync.totalSections}'
+                              : sync.downloadError != null && !sync.offline
+                              ? 'Copia offline incompleta · pulsa para reintentar'
+                              : sync.needsLogin
                               ? 'Vuelve a iniciar sesión para sincronizar'
                               : '${sync.offline
-                                    ? "Modo offline · datos guardados"
+                                    ? (sync.offlineReady ? "Modo offline · datos guardados" : "Modo offline · copia inicial incompleta")
                                     : sync.serverUnavailable
                                     ? "Servidor temporalmente no disponible"
                                     : sync.syncing
@@ -95,8 +101,31 @@ class _ColaSheet extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Se envían en orden al recuperar la conexión. El servidor confirma stock y precios. Los pagos requieren autorización en línea.',
+                'Se envían en orden al recuperar la conexión. El servidor confirma stock y precios. Wallet reserva el saldo localmente y queda pendiente hasta su validación. PayPal necesita Internet.',
                 style: TextStyle(fontSize: 13),
+              ),
+              if (sync.downloadingData) ...[
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: sync.totalSections == 0
+                      ? null
+                      : sync.downloadedSections / sync.totalSections,
+                ),
+                Text(
+                  'Descargando datos: ${sync.downloadedSections}/${sync.totalSections}',
+                ),
+              ],
+              if (sync.downloadError != null)
+                Text(
+                  sync.downloadError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              TextButton.icon(
+                onPressed: sync.downloadingData
+                    ? null
+                    : () => sync.downloadOfflineData(),
+                icon: const Icon(Icons.download_for_offline_outlined),
+                label: const Text('Actualizar datos offline'),
               ),
               Expanded(
                 child: ListView(

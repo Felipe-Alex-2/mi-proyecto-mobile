@@ -47,6 +47,113 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   int get pendingCount => operations.length;
   bool get hasFailures => operations.any((r) => r['state'] == 'blocked');
 
+  bool downloadingData = false;
+  bool offlineReady = false;
+  int downloadedSections = 0, totalSections = 0;
+  String? downloadError;
+  String? _snapshotRole;
+  Future<void>? _downloadTask;
+  String? _downloadOwner;
+
+  Future<void> downloadOfflineData({String? role}) {
+    if (role != null) _snapshotRole = role;
+    if (offline || _disposed) return Future<void>.value();
+    final account = owner;
+    if (_downloadTask != null) {
+      if (_downloadOwner == account) return _downloadTask!;
+      return _downloadTask!.then((_) async {
+        if (owner == account && !_disposed) await downloadOfflineData();
+      });
+    }
+    _downloadOwner = account;
+    return _downloadTask = _downloadSnapshot().whenComplete(() {
+      _downloadTask = null;
+      _downloadOwner = null;
+    });
+  }
+
+  Future<void> _downloadSnapshot() async {
+    final account = owner;
+    if (account == null || _disposed) return;
+    final paths = [
+      '/users/me',
+      '/products',
+      '/cart',
+      '/reservations',
+      '/branches?is_active=true',
+      '/catalog/filters',
+      if (_snapshotRole == 'CUSTOMER') '/wallet',
+      '/notifications',
+      '/virtual-fitting/profile',
+      '/virtual-fitting/sessions',
+    ];
+    final required = paths
+        .where(
+          (p) => !p.startsWith('/virtual-fitting') && p != '/notifications',
+        )
+        .toSet();
+    final saved = <String>[];
+    downloadingData = true;
+    downloadedSections = 0;
+    totalSections = paths.length;
+    downloadError = null;
+    notifyListeners();
+    try {
+      for (final path in paths) {
+        if (_disposed || owner != account) return;
+        try {
+          // A successful login proves connectivity. Do not let an old offline
+          // flag turn a requested download into a read of the old local cache.
+          final value = await send('GET', path, {});
+          if (_disposed || owner != account) return;
+          if (path == '/wallet') {
+            await store.transaction(
+              (tx) =>
+                  _saveWallet(account, Map<String, dynamic>.from(value), tx),
+            );
+          } else {
+            await store.write(account, path, value);
+          }
+          saved.add(path);
+          offline = false;
+          serverUnavailable = false;
+        } catch (e) {
+          if (e is ApiException && e.statusCode == 401) {
+            needsLogin = true;
+            break;
+          }
+          if (required.contains(path)) {
+            downloadError = 'No se completó la copia offline. Conéctate y pulsa Actualizar datos offline.';
+          }
+          if (e is ApiException && (e.statusCode == 0 || e.statusCode == 408)) {
+            await checkAfterFailure(e);
+            if (offline) break;
+          }
+        }
+        if (_disposed || owner != account) return;
+        downloadedSections++;
+        notifyListeners();
+      }
+      if (_disposed || owner != account) return;
+      offlineReady = required.every(saved.contains);
+      await store.write(account, '/offline/manifest', {
+        'ready': offlineReady,
+        'saved_paths': saved,
+        'role': _snapshotRole,
+        'downloaded_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      revision++;
+    } catch (_) {
+      if (owner == account) {
+        downloadError =
+            'No se pudo guardar la copia offline. Reintenta la descarga.';
+      }
+    } finally {
+      downloadingData = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   void start() {
     WidgetsBinding.instance.addObserver(this);
     final connectivity = Connectivity();
@@ -113,12 +220,20 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> activate(String key) async {
     owner = key;
     needsLogin = false;
+    final manifest = await store.read(key, '/offline/manifest');
+    if (owner != key) return;
+    offlineReady = manifest?['ready'] == true;
+    _snapshotRole = manifest?['role'] as String?;
+    downloadError = null;
     await refresh();
   }
 
   void deactivate() {
     owner = null;
     operations = [];
+    offlineReady = false;
+    _snapshotRole = null;
+    downloadError = null;
     notifyListeners();
   }
 
@@ -162,7 +277,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
       offline = false;
       serverUnavailable = false;
       if (path == '/wallet') {
-        await store.db.transaction(
+        await store.transaction(
           (tx) => _saveWallet(account, Map<String, dynamic>.from(base), tx),
         );
       } else {
@@ -223,7 +338,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     Map<String, dynamic> value,
   ) async {
     if (owner != expectedOwner) return;
-    await store.db.transaction((tx) => _saveWallet(expectedOwner, value, tx));
+    await store.transaction((tx) => _saveWallet(expectedOwner, value, tx));
   }
 
   bool _sameWallet(String a, String b) {
@@ -607,15 +722,17 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
       preview = Map<String, dynamic>.from(matching.first);
       preview['payment_status'] = 'SYNC_PENDING';
     }
-    await store.db.insert('outbox', {
-      'owner': account,
-      'id': id,
-      'method': method,
-      'path': path,
-      'body': jsonEncode(body),
-      'preview': jsonEncode(preview),
-      'created_at': now.toIso8601String(),
-    });
+    await store.transaction(
+      (tx) => tx.insert('outbox', {
+        'owner': account,
+        'id': id,
+        'method': method,
+        'path': path,
+        'body': jsonEncode(body),
+        'preview': jsonEncode(preview),
+        'created_at': now.toIso8601String(),
+      }),
+    );
     await refresh();
     await SincronizacionSegundoPlano.schedule();
     if (!offline) await sync();
@@ -731,7 +848,27 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> sync() =>
-      _syncTask ??= _drain().whenComplete(() => _syncTask = null);
+      _syncTask ??= _syncAndPrepare().whenComplete(() => _syncTask = null);
+
+  Future<void> _syncAndPrepare() async {
+    try {
+      await _drain();
+      if (!_disposed &&
+          owner != null &&
+          !offline &&
+          !needsLogin &&
+          !downloadingData &&
+          !offlineReady &&
+          _snapshotRole != null) {
+        await downloadOfflineData();
+      }
+    } catch (_) {
+      // A temporary database/network failure must not kill the reconnect timer.
+      // The pending operation remains durable and is retried on the next tick.
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   bool _sameAccount(String a, String b) {
     final aa = a.split('|'), bb = b.split('|');
     return aa.first == bb.first && aa.last == bb.last;
@@ -813,7 +950,7 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             'path': path,
             'body': jsonDecode(row['body'] as String),
           });
-          await store.db.transaction((tx) async {
+          await store.transaction((tx) async {
             await store.write(account, 'receipt:${row['id']}', result, tx: tx);
             if (path.startsWith('/cart')) {
               await store.write(account, '/cart', result, tx: tx);
@@ -904,11 +1041,13 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
             break;
           }
           if (e.statusCode == 429) break;
-          await store.db.update(
-            'outbox',
-            {'state': 'blocked', 'error': e.message},
-            where: 'id=? AND owner=?',
-            whereArgs: [row['id'], account],
+          await store.transaction(
+            (tx) => tx.update(
+              'outbox',
+              {'state': 'blocked', 'error': e.message},
+              where: 'id=? AND owner=?',
+              whereArgs: [row['id'], account],
+            ),
           );
           break;
         } catch (_) {
@@ -924,11 +1063,13 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> retry() async {
     if (owner == null) return;
     for (final row in operations) {
-      await store.db.update(
-        'outbox',
-        {'state': 'pending', 'error': null},
-        where: 'id=? AND owner=?',
-        whereArgs: [row['id'], row['owner']],
+      await store.transaction(
+        (tx) => tx.update(
+          'outbox',
+          {'state': 'pending', 'error': null},
+          where: 'id=? AND owner=?',
+          whereArgs: [row['id'], row['owner']],
+        ),
       );
     }
     offline = false;
@@ -940,10 +1081,12 @@ class SinConexionService extends ChangeNotifier with WidgetsBindingObserver {
     final target = operations.where((r) => r['seq'] == seq).firstOrNull;
     if (target == null) return;
     // Discard dependents only in the original company/branch context.
-    await store.db.delete(
-      'outbox',
-      where: 'owner=? AND seq>=?',
-      whereArgs: [target['owner'], seq],
+    await store.transaction(
+      (tx) => tx.delete(
+        'outbox',
+        where: 'owner=? AND seq>=?',
+        whereArgs: [target['owner'], seq],
+      ),
     );
     await refresh();
   }

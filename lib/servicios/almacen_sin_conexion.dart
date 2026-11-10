@@ -53,48 +53,60 @@ class AlmacenSinConexion {
     'CREATE TABLE IF NOT EXISTS cache_parts (owner TEXT NOT NULL,path TEXT NOT NULL,part INTEGER NOT NULL,data BLOB NOT NULL,PRIMARY KEY(owner,path,part))',
   );
 
-  Future<dynamic> read(String owner, String path, {DatabaseExecutor? tx}) =>
-      tx == null
-      ? db.transaction((transaction) => read(owner, path, tx: transaction))
-      : _read(tx, owner, path);
-
-  Future<dynamic> _read(DatabaseExecutor tx, String owner, String path) async {
-    // Never SELECT a complete legacy JSON row: Android CursorWindow cannot fit it.
-    final rows = await tx.query(
-      'cache',
-      columns: ['length(CAST(data AS BLOB)) AS byte_length'],
-      where: 'owner=? AND path=?',
-      whereArgs: [owner, path],
+  /// One SELECT gives a consistent snapshot without BEGIN IMMEDIATE. Readers
+  /// must not compete for the writer lock held by the background sync isolate.
+  Future<dynamic> read(
+    String owner,
+    String path, {
+    DatabaseExecutor? tx,
+  }) async {
+    final rows = await (tx ?? db).rawQuery(
+      '''WITH RECURSIVE slices(start, size) AS (
+      SELECT 1, length(CAST(data AS BLOB)) FROM cache
+        WHERE owner=? AND path=? AND data<>''
+      UNION ALL SELECT start+$chunkBytes,size FROM slices WHERE start+$chunkBytes<=size
+    )
+    SELECT slices.start AS position, substr(CAST(c.data AS BLOB),slices.start,$chunkBytes) AS bytes
+      FROM slices JOIN cache c ON c.owner=? AND c.path=?
+    UNION ALL
+    SELECT (part*$chunkBytes)+1 AS position, data AS bytes FROM cache_parts
+      WHERE owner=? AND path=? AND EXISTS
+        (SELECT 1 FROM cache WHERE owner=? AND path=? AND data='')
+    ORDER BY position''',
+      [owner, path, owner, path, owner, path, owner, path],
     );
     if (rows.isEmpty) return null;
-    final size = rows.first['byte_length'] as int;
     final bytes = BytesBuilder(copy: false);
-    if (size == 0) {
-      final parts = await tx.query(
-        'cache_parts',
-        columns: ['part', 'data'],
-        where: 'owner=? AND path=?',
-        whereArgs: [owner, path],
-        orderBy: 'part ASC',
-      );
-      for (var i = 0; i < parts.length; i++) {
-        if (parts[i]['part'] != i) {
-          throw const FormatException(
-            'Datos locales incompletos. Actualiza el catálogo con Internet.',
-          );
-        }
-        bytes.add(parts[i]['data'] as Uint8List);
-      }
-    } else {
-      for (var offset = 0; offset < size; offset += chunkBytes) {
-        final part = await tx.rawQuery(
-          'SELECT substr(CAST(data AS BLOB),?,?) AS part FROM cache WHERE owner=? AND path=?',
-          [offset + 1, chunkBytes, owner, path],
+    var expected = 1;
+    for (final row in rows) {
+      if (row['position'] != expected) {
+        throw const FormatException(
+          'Datos locales incompletos. Actualiza el catálogo con Internet.',
         );
-        bytes.add(part.single['part'] as Uint8List);
       }
+      final part = row['bytes'] as Uint8List;
+      bytes.add(part);
+      expected += part.length;
     }
     return jsonDecode(utf8.decode(bytes.takeBytes()));
+  }
+
+  Future<T> transaction<T>(Future<T> Function(Transaction) action) async {
+    // Another Android isolate can briefly own the writer connection. Retry only
+    // transactions rolled back by SQLite; never repeat network/payment calls.
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await db.transaction(action, exclusive: false);
+      } on DatabaseException catch (e) {
+        final message = e.toString().toLowerCase();
+        if (attempt >= 4 ||
+            !(message.contains('database is locked') ||
+                message.contains('sqlite_busy'))) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 150 * (attempt + 1)));
+      }
+    }
   }
 
   Future<void> write(
@@ -104,7 +116,7 @@ class AlmacenSinConexion {
     DatabaseExecutor? tx,
   }) async {
     if (tx == null) {
-      await db.transaction(
+      await transaction(
         (transaction) => write(owner, path, data, tx: transaction),
       );
       return;
@@ -138,52 +150,47 @@ class AlmacenSinConexion {
     }
   }
 
-  Future<List<Map<String, Object?>>> queue([String? owner]) => db.transaction((
-    tx,
-  ) async {
-    // Previews may contain inline product photos too. Read large text by slices,
-    // including queues created by older app versions, without losing operations.
-    final rows = await tx.query(
-      'outbox',
-      columns: [
-        'seq',
-        'owner',
-        'id',
-        'method',
-        'path',
-        'state',
-        'error',
-        'created_at',
-        'length(CAST(body AS BLOB)) AS body_length',
-        'length(CAST(preview AS BLOB)) AS preview_length',
-      ],
-      where: owner == null ? null : 'owner=?',
-      whereArgs: owner == null ? null : [owner],
-      orderBy: 'seq ASC',
+  Future<List<Map<String, Object?>>> queue([String? owner]) async {
+    final filter = owner == null ? '' : 'WHERE owner=?';
+    final rows = await db.rawQuery(
+      '''WITH RECURSIVE pieces(seq,field,start,size) AS (
+      SELECT seq,'body',1,length(CAST(body AS BLOB)) FROM outbox $filter
+      UNION ALL SELECT seq,'preview',1,length(CAST(preview AS BLOB)) FROM outbox $filter
+      UNION ALL SELECT seq,field,start+$chunkBytes,size FROM pieces WHERE start+$chunkBytes<=size
+    )
+    SELECT o.seq,o.owner,o.id,o.method,o.path,o.state,o.error,o.created_at,
+      pieces.field,pieces.start,
+      substr(CAST(CASE pieces.field WHEN 'body' THEN o.body ELSE o.preview END AS BLOB),pieces.start,$chunkBytes) AS bytes
+    FROM pieces JOIN outbox o ON o.seq=pieces.seq ORDER BY o.seq,pieces.field,pieces.start''',
+      owner == null ? [] : [owner, owner],
     );
     final result = <Map<String, Object?>>[];
-    for (final row in rows) {
-      final value = Map<String, Object?>.from(row);
-      for (final field in ['body', 'preview']) {
-        final size = value.remove('${field}_length') as int?;
-        if (size == null) {
-          value[field] = null;
-          continue;
-        }
-        final bytes = BytesBuilder(copy: false);
-        for (var offset = 0; offset < size; offset += chunkBytes) {
-          final part = await tx.rawQuery(
-            'SELECT substr(CAST($field AS BLOB),?,?) AS part FROM outbox WHERE seq=? AND owner=?',
-            [offset + 1, chunkBytes, row['seq'], row['owner']],
-          );
-          bytes.add(part.single['part'] as Uint8List);
-        }
-        value[field] = utf8.decode(bytes.takeBytes());
-      }
-      result.add(value);
+    Map<String, Object?>? value;
+    BytesBuilder? bytes;
+    String? field;
+    void finish() {
+      if (bytes != null) value![field!] = utf8.decode(bytes.takeBytes());
     }
+
+    for (final row in rows) {
+      if (value?['seq'] != row['seq'] || field != row['field']) {
+        finish();
+        if (value?['seq'] != row['seq']) {
+          value = Map<String, Object?>.from(row)
+            ..remove('field')
+            ..remove('start')
+            ..remove('bytes');
+          result.add(value);
+        }
+        field = row['field'] as String;
+        bytes = row['bytes'] == null ? null : BytesBuilder(copy: false);
+        value![field] = null;
+      }
+      if (row['bytes'] != null) bytes!.add(row['bytes'] as Uint8List);
+    }
+    finish();
     return result;
-  });
+  }
 
   Future<String> resolve(String owner, String id) async {
     final rows = await db.query(

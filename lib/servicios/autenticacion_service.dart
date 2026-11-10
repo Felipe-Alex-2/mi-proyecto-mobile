@@ -52,33 +52,19 @@ class AutenticacionService extends ChangeNotifier {
 
   Future<void> _warmCache() async {
     final scope = _currentUser?.scopeKey;
-    for (final path in [
-      '/users/me',
-      '/products',
-      '/cart',
-      if (_currentUser?.role == 'CUSTOMER') '/wallet',
-      '/reservations',
-      '/branches?is_active=true',
-      '/catalog/filters',
-      '/virtual-fitting/profile',
-      '/virtual-fitting/sessions',
-      '/notifications',
-    ]) {
+    try {
+      if (offline != null) {
+        await offline!.downloadOfflineData(role: _currentUser?.role);
+      }
       if (_disposed || !isAuthenticated || _currentUser?.scopeKey != scope) {
         return;
       }
-      try {
-        await _apiService.get(path);
-      } catch (_) {}
+      await offline?.sync();
+      await SincronizacionSegundoPlano.schedule();
+    } catch (_) {
+      // Download failures are visible in the offline status bar; authentication
+      // stays valid and durable operations remain available for the next retry.
     }
-    if (_disposed || !isAuthenticated || _currentUser?.scopeKey != scope) {
-      return;
-    }
-    await offline?.sync();
-    if (_disposed || !isAuthenticated || _currentUser?.scopeKey != scope) {
-      return;
-    }
-    await SincronizacionSegundoPlano.schedule();
   }
 
   Future<bool> setBiometric(bool value) async {
@@ -198,6 +184,7 @@ class AutenticacionService extends ChangeNotifier {
       }
       try {
         final data = await _apiService.sendOnline('GET', '/users/me', {});
+        offline?.offline = false;
         _currentUser = Usuario.fromJson(data);
         await _activate(_currentUser!);
       } on ApiException catch (e) {
@@ -239,6 +226,7 @@ class AutenticacionService extends ChangeNotifier {
       );
 
       await _activate(_currentUser!);
+      offline?.offline = false;
       _status = AuthStatus.authenticated;
       _warmCache();
       notifyListeners();

@@ -26,6 +26,12 @@ class RecomendacionService extends SesionNotifier {
   Future<RecomendacionResponse> _local(String text) async {
     final offline = _api.offline;
     final owner = offline?.owner;
+    final assistant = AsistenteLocalCatalogo();
+    // FAQs are bundled with the app and do not depend on SQLite or a model.
+    if (assistant.faq(text) != null) {
+      _isLocalResponse = true;
+      return assistant.respond(text, []);
+    }
     final cached = await offline?.cached('/products');
     if (owner != _api.offline?.owner) {
       throw ApiException(
@@ -39,7 +45,6 @@ class RecomendacionService extends SesionNotifier {
         )
         .toList();
     _isLocalResponse = true;
-    final assistant = AsistenteLocalCatalogo();
     final result = assistant.respond(text, products);
     if (assistant.faq(text) == null &&
         result.matchedFilters.isEmpty &&

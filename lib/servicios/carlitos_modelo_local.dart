@@ -112,7 +112,9 @@ class CarlitosModeloLocal extends SesionNotifier {
     } catch (e) {
       error = _cancelled
           ? 'Descarga pausada. Puedes reanudarla.'
-          : e.toString();
+          : e is SocketException
+          ? 'Conéctate a Internet para descargar el modelo. Las preguntas frecuentes y la búsqueda del catálogo funcionan sin esta descarga.'
+          : 'No se pudo completar la descarga. Revisa tu conexión y espacio disponible, y reintenta.';
     } finally {
       await sink?.close();
       _client?.close(force: true);

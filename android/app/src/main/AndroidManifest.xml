@@ -11,6 +11,9 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:usesCleartextTraffic="true">
+        <!-- Enable WAL in Android's connection pool, including Workmanager's
+             separate connection. A SQL PRAGMA alone does not set this flag. -->
+        <meta-data android:name="com.tekartik.sqflite.wal_enabled" android:value="true"/>
         <meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true"/>
         <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false"/>
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false"/>
