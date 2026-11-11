@@ -44,6 +44,15 @@ http.Response jsonResponse(dynamic body) => http.Response(
 );
 
 void main() {
+  test('report labels identify the period and lowest sales in exported and displayed reports', () {
+    expect(reportLabel('period'), 'Periodo consultado');
+    expect(reportLabel('lowest_USD'), 'Menor venta (USD)');
+    expect(
+      reportLabel('comparison_total_USD'),
+      'Total de todo el ámbito (USD)',
+    );
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
     'wallet displays only confirmed balance and verifies a pending topup',

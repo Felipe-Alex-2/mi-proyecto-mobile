@@ -11,6 +11,12 @@ import '../../servicios/api_service.dart';
 import '../../servicios/autenticacion_service.dart';
 
 const reportLabels = {
+  'comparison_sales': 'Cobros de todo el ámbito',
+  'comparison_units': 'Unidades de todo el ámbito',
+  'least_stock_branch': 'Menor inventario',
+  'period': 'Periodo consultado',
+  'ranking_criterion': 'Criterio de comparación',
+  'matching_records': 'Registros encontrados',
   'company': 'Empresa',
   'companies': 'Empresas',
   'branch': 'Sucursal',
@@ -43,7 +49,11 @@ const reportLabels = {
 };
 String reportLabel(String key) =>
     reportLabels[key] ??
-    (key.startsWith('leader_')
+    (key.startsWith('comparison_total_')
+        ? 'Total de todo el ámbito (${key.substring(17)})'
+        : key.startsWith('lowest_')
+        ? 'Menor venta (${key.substring(7)})'
+        : key.startsWith('leader_')
         ? 'Mayor venta (${key.substring(7)})'
         : key.startsWith('total_')
         ? 'Total (${key.substring(6)})'
