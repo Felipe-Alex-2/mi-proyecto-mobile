@@ -47,6 +47,9 @@ void main() {
   test('report labels identify the period and lowest sales in exported and displayed reports', () {
     expect(reportLabel('period'), 'Periodo consultado');
     expect(reportLabel('lowest_USD'), 'Menor venta (USD)');
+    expect(reportLabel('sum_units'), contains('Unidades'));
+    expect(reportLabel('avg_unit_price'), contains('Precio unitario'));
+    expect(reportLabel('interpretation_source'), 'Interpretación');
     expect(
       reportLabel('comparison_total_USD'),
       'Total de todo el ámbito (USD)',
@@ -54,6 +57,29 @@ void main() {
   });
 
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'report requests allow interpretation time without slowing normal timeouts',
+    () async {
+      final api = ApiService(
+        _Storage(),
+        requestTimeout: const Duration(milliseconds: 5),
+        reportTimeout: const Duration(seconds: 1),
+        client: MockClient((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return jsonResponse({'ok': true});
+        }),
+      );
+      addTearDown(api.dispose);
+      expect(
+        await api.postOnline('/reports/voice', body: {'transcript': 'ventas'}),
+        {'ok': true},
+      );
+      await expectLater(
+        api.postOnline('/wallet/topups'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 408)),
+      );
+    },
+  );
   testWidgets(
     'wallet displays only confirmed balance and verifies a pending topup',
     (tester) async {

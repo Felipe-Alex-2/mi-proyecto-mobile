@@ -11,6 +11,33 @@ import '../../servicios/api_service.dart';
 import '../../servicios/autenticacion_service.dart';
 
 const reportLabels = {
+  'interpretation_source': 'Interpretación',
+  'unit_price': 'Precio unitario neto',
+  'current_value': 'Valor de venta del stock',
+  'day': 'Día',
+  'week': 'Semana',
+  'month': 'Mes',
+  'year': 'Año',
+  'movement_type': 'Tipo de movimiento',
+  'previous_stock': 'Stock anterior',
+  'new_stock': 'Stock nuevo',
+  'reason': 'Motivo',
+  'courier': 'Repartidor',
+  'fee': 'Envío cotizado (USD)',
+  'distance_km': 'Distancia (km)',
+  'estimated_minutes': 'Minutos estimados',
+  'points': 'Puntos',
+  'description': 'Descripción',
+  'role': 'Rol',
+  'active': 'Activo',
+  'estimated_amount': 'Importe estimado',
+  'payment_status': 'Estado de pago',
+  'reservation_code': 'Código de reserva',
+  'created_at': 'Fecha de registro',
+  'unitemized_sales': 'Cobros sin detalle de prendas',
+  'unpriced_sales': 'Ventas sin desglose histórico de importes',
+  'records_shown': 'Filas mostradas',
+  'limit_scope': 'Límite aplicado',
   'comparison_sales': 'Cobros de todo el ámbito',
   'comparison_units': 'Unidades de todo el ámbito',
   'least_stock_branch': 'Menor inventario',
@@ -47,17 +74,30 @@ const reportLabels = {
   'branches': 'Sucursales',
   'total': 'Total',
 };
-String reportLabel(String key) =>
-    reportLabels[key] ??
-    (key.startsWith('comparison_total_')
-        ? 'Total de todo el ámbito (${key.substring(17)})'
-        : key.startsWith('lowest_')
-        ? 'Menor venta (${key.substring(7)})'
-        : key.startsWith('leader_')
-        ? 'Mayor venta (${key.substring(7)})'
-        : key.startsWith('total_')
-        ? 'Total (${key.substring(6)})'
-        : key.replaceAll('_', ' '));
+String reportLabel(String key) {
+  if (reportLabels.containsKey(key)) return reportLabels[key]!;
+  const operations = {
+    'sum_': 'Total de ',
+    'avg_': 'Promedio de ',
+    'count_': 'Cantidad de ',
+    'distinct_': 'Valores distintos de ',
+    'min_': 'Mínimo de ',
+    'max_': 'Máximo de ',
+  };
+  for (final entry in operations.entries) {
+    if (key.startsWith(entry.key)) {
+      return entry.value + reportLabel(key.substring(entry.key.length));
+    }
+  }
+  if (key.startsWith('comparison_total_')) {
+    return 'Total de todo el ámbito (${key.substring(17)})';
+  }
+  if (key.startsWith('lowest_')) return 'Menor venta (${key.substring(7)})';
+  if (key.startsWith('leader_')) return 'Mayor venta (${key.substring(7)})';
+  if (key.startsWith('total_')) return 'Total (${key.substring(6)})';
+  return key.replaceAll('_', ' ');
+}
+
 String reportCsv(Map<String, dynamic> report) {
   String cell(dynamic value) {
     var text = '${value ?? ''}';

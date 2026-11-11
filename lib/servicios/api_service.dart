@@ -117,12 +117,14 @@ class ApiService {
   final http.Client _client;
   final Duration requestTimeout;
   final Duration uploadTimeout;
+  final Duration reportTimeout;
 
   ApiService(
     this._storageService, {
     http.Client? client,
     this.requestTimeout = const Duration(seconds: 30),
     this.uploadTimeout = const Duration(minutes: 5),
+    this.reportTimeout = const Duration(seconds: 90),
   }) : _client = client ?? http.Client();
 
   void dispose() => _client.close();
@@ -198,7 +200,9 @@ class ApiService {
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
           )
-          .timeout(requestTimeout);
+          .timeout(
+            endpoint.startsWith('/reports/') ? reportTimeout : requestTimeout,
+          );
       return _processResponse(response);
     } on TimeoutException {
       throw ApiException(
